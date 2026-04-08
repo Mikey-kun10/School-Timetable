@@ -1,17 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { DAYS, COLLEGES } from "@/lib/types";
+import { useState, useEffect } from "react";
+import { Day, DAYS, Department } from "@/lib/types";
 import { Field, SubmitBtn } from "@/components/ui/FormFields";
+import { departmentApi } from "@/lib/api";
+
+interface LecturerData {
+  id?: number;
+  first_name: string;
+  last_name: string;
+  staff_id: string;
+  department: number;
+  email: string;
+  unavailable_days_input?: string[];
+  unavailable_days?: { id: number, day: string }[];
+}
 
 interface Props {
-  initial?: { name: string; email: string; college: string; availableDays: string[] };
-  onSubmit: (data: {
-    name: string;
-    email: string;
-    college: string;
-    availableDays: string[];
-  }) => void;
+  initial?: LecturerData;
+  onSubmit: (data: LecturerData) => void;
   loading?: boolean;
 }
 
@@ -22,10 +29,19 @@ const selectCls = `
 `;
 
 export default function LecturerForm({ initial, onSubmit, loading }: Props) {
-  const [days, setDays] = useState<string[]>(initial?.availableDays ?? []);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  // We manage the UI state as available days for user friendliness
+  const currentUnavailable = initial?.unavailable_days?.map(d => d.day) || [];
+  const [availableDays, setAvailableDays] = useState<string[]>(
+    initial ? DAYS.filter(d => !currentUnavailable.includes(d)) : DAYS
+  );
+
+  useEffect(() => {
+    departmentApi.getAll().then(setDepartments).catch(console.error);
+  }, []);
 
   const toggle = (day: string) =>
-    setDays((prev) =>
+    setAvailableDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
     );
 
@@ -34,46 +50,69 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        // Calculate unavailable days to send directly to backend
+        const unavailableDays = DAYS.filter((d) => !availableDays.includes(d));
+
         onSubmit({
-          name: fd.get("name") as string,
+          first_name: fd.get("first_name") as string,
+          last_name: fd.get("last_name") as string,
+          staff_id: fd.get("staff_id") as string,
           email: fd.get("email") as string,
-          college: fd.get("college") as string,
-          availableDays: days,
+          department: Number(fd.get("department")),
+          unavailable_days_input: unavailableDays,
         });
       }}
       className="space-y-4"
     >
-      <Field
-        label="Full Name"
-        name="name"
-        defaultValue={initial?.name}
-        placeholder="e.g. Dr. John Smith"
-        required
-      />
-      <Field
-        label="Email"
-        name="email"
-        type="email"
-        defaultValue={initial?.email}
-        placeholder="e.g. j.smith@university.edu"
-        required
-      />
+      <div className="grid grid-cols-2 gap-4">
+        <Field
+          label="First Name"
+          name="first_name"
+          defaultValue={initial?.first_name}
+          placeholder="e.g. John"
+          required
+        />
+        <Field
+          label="Last Name"
+          name="last_name"
+          defaultValue={initial?.last_name}
+          placeholder="e.g. Smith"
+          required
+        />
+      </div>
 
-      {/* College */}
+      <div className="grid grid-cols-2 gap-4">
+        <Field
+          label="Staff ID"
+          name="staff_id"
+          defaultValue={initial?.staff_id}
+          placeholder="e.g. STF-100"
+          required
+        />
+        <Field
+          label="Email"
+          name="email"
+          type="email"
+          defaultValue={initial?.email}
+          placeholder="e.g. j.smith@uni.edu"
+          required
+        />
+      </div>
+
       <div>
         <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-          College
+          Department
         </label>
         <select
-          name="college"
-          defaultValue={initial?.college ?? ""}
+          name="department"
+          defaultValue={initial?.department ?? ""}
           required
           className={selectCls}
         >
-          <option value="">Select college…</option>
-          {COLLEGES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.name}
+          <option value="">Select department…</option>
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name} ({d.code})
             </option>
           ))}
         </select>
@@ -92,7 +131,7 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
               className={`
                 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
                 ${
-                  days.includes(day)
+                  availableDays.includes(day)
                     ? "bg-blue-600 border-blue-500 text-white"
                     : "bg-blue-400 border-blue-300 text-white hover:bg-blue-600 hover:border-blue-500"
                 }
@@ -102,11 +141,6 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
             </button>
           ))}
         </div>
-        {days.length === 0 && (
-          <p className="text-xs text-rose-400 mt-2">
-            Select at least one available day.
-          </p>
-        )}
       </div>
 
       <SubmitBtn loading={loading} />

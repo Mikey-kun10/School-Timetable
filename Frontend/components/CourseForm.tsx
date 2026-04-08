@@ -1,25 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LEVELS, COLLEGES } from "@/lib/types";
+import { LEVELS, Course, Department, Lecturer } from "@/lib/types";
 import { Field, SubmitBtn } from "@/components/ui/FormFields";
-import { lecturerStore, departmentStore } from "@/lib/store";
-import type { Lecturer, Department } from "@/lib/types";
-
-interface CourseFormData {
-  courseCode: string;
-  title: string;
-  college: string;
-  duration: number;
-  level: string;
-  departments: string[];
-  lecturerId: string;
-  departmentId?: string;
-}
+import { departmentApi, lecturerApi } from "@/lib/api";
 
 interface Props {
-  initial?: CourseFormData;
-  onSubmit: (data: CourseFormData) => void;
+  initial?: Course;
+  onSubmit: (data: Course) => void;
   loading?: boolean;
 }
 
@@ -31,27 +19,27 @@ const selectCls = `
 
 export default function CourseForm({ initial, onSubmit, loading }: Props) {
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
-  const [courseLevel, setCourseLevel] = useState("all")
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [deptMode, setDeptMode] = useState<"all" | "specific">(
-    !initial || initial.departments.includes("ALL") ? "all" : "specific",
+  const [courseType, setCourseType] = useState<"departmental" | "shared" | "general">(
+    initial?.course_type ?? "departmental"
   );
-  const [lecturerId, setLecturerId] = useState(initial?.lecturerId ?? "");
-  const [college, setCollege] = useState(initial?.college ?? "");
-  const [selectedDepts, setSelectedDepts] = useState<string[]>(
-    initial?.departments.filter((d) => d !== "ALL") ?? [],
+  const [selectedSharedDepts, setSelectedSharedDepts] = useState<number[]>(
+    initial?.shared_departments ?? []
   );
 
   useEffect(() => {
-    setLecturers(lecturerStore.getAll());
-    setDepartments(departmentStore.getAll());
+    Promise.all([
+      departmentApi.getAll(),
+      lecturerApi.getAll()
+    ]).then(([depts, lects]) => {
+      setDepartments(depts);
+      setLecturers(lects);
+    }).catch(console.error);
+  }, []);
 
-    if (initial?.lecturerId) setLecturerId(initial.lecturerId);
-  }, [initial?.lecturerId]);
-
-  const toggleDept = (code: string, level: string) =>
-    setSelectedDepts((prev) =>
-      prev.includes(`${code} — ${level}`) ? prev.filter((d) => d !== `${code} — ${level}`) : [...prev, `${code} — ${level}`],
+  const toggleSharedDept = (id: number) =>
+    setSelectedSharedDepts((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
     );
 
   return (
@@ -60,25 +48,43 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         onSubmit({
-          courseCode: (fd.get("courseCode") as string).toUpperCase(),
-          title: fd.get("title") as string,
-          college: fd.get("college") as string,
-          duration: Number(fd.get("duration")),
-          level: fd.get("level") as string,
-          lecturerId: fd.get("lecturerId") as string,
-          departmentId: (fd.get("departmentId") as string) || undefined,
-          departments: deptMode === "all" ? ["ALL"] : selectedDepts,
+          name: fd.get("name") as string,
+          code: (fd.get("code") as string).toUpperCase(),
+          department: Number(fd.get("department")),
+          level: Number(fd.get("level")),
+          course_type: courseType,
+          shared_departments: courseType === "shared" ? selectedSharedDepts : [],
+          units: Number(fd.get("units")),
+          hours: Number(fd.get("hours")),
+          student_count: Number(fd.get("student_count")),
+          lecturer: fd.get("lecturer") ? Number(fd.get("lecturer")) : null,
+          shared_session_id: fd.get("shared_session_id") as string || null,
         });
       }}
       className="space-y-4"
     >
-      {/* Code + Level row */}
       <div className="grid grid-cols-2 gap-4">
         <Field
           label="Course Code"
-          name="courseCode"
-          defaultValue={initial?.courseCode}
+          name="code"
+          defaultValue={initial?.code}
           placeholder="e.g. CS301"
+          required
+        />
+        <Field
+          label="Shared Session ID (Optional)"
+          name="shared_session_id"
+          defaultValue={initial?.shared_session_id || ""}
+          placeholder="e.g. GROUP_A"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field
+          label="Course Title"
+          name="name"
+          defaultValue={initial?.name}
+          placeholder="e.g. Data Structures & Algorithms"
           required
         />
         <div>
@@ -89,9 +95,6 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
             name="level"
             defaultValue={initial?.level ?? ""}
             required
-            onChange={(e) => {
-              e.target.value === "" ? setCourseLevel("all") : setCourseLevel(e.target.value)
-            }}
             className={selectCls}
           >
             <option value="">Select…</option>
@@ -104,37 +107,23 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
         </div>
       </div>
 
-      {/* Title */}
-      <Field
-        label="Course Title"
-        name="title"
-        defaultValue={initial?.title}
-        placeholder="e.g. Data Structures & Algorithms"
-        required
-      />
-
-      {/* Duration + Lecturer row */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-            Duration (hours)
+            Primary Department
           </label>
           <select
-            name="duration"
-            defaultValue={initial?.duration ?? ""}
+            name="department"
+            defaultValue={initial?.department ?? ""}
             required
             className={selectCls}
           >
             <option value="">Select…</option>
-            <option key={1} value={1}>
-              1 hour
-            </option>
-            <option key={2} value={2}>
-              2 hours
-            </option>
-            <option key={3} value={3}>
-              3 hours
-            </option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -143,151 +132,93 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
             Lecturer
           </label>
           <select
-            name="lecturerId"
-            value={lecturerId}
-            onChange={(e) => setLecturerId(e.target.value)}
-            required
+            name="lecturer"
+            defaultValue={initial?.lecturer ?? ""}
             className={selectCls}
           >
             <option value="">Select…</option>
             {lecturers.map((l) => (
-              <option key={l.id} value={String(l.id)}>
-                {l.name} — {l.college}
+              <option key={l.id} value={l.id}>
+                {l.first_name} {l.last_name}
               </option>
             ))}
           </select>
-          {lecturers.length === 0 && (
-            <p className="text-xs text-amber-400 mt-1">
-              No lecturers found. Add one first.
-            </p>
-          )}
         </div>
       </div>
 
-      {/* College */}
+      <div className="grid grid-cols-3 gap-4">
+        <Field
+          label="Units"
+          name="units"
+          type="number"
+          defaultValue={initial?.units ? String(initial.units) : "2"}
+          required
+        />
+        <Field
+          label="Weekly Hours"
+          name="hours"
+          type="number"
+          defaultValue={initial?.hours ? String(initial.hours) : "2"}
+          required
+        />
+        <Field
+          label="Student Count"
+          name="student_count"
+          type="number"
+          defaultValue={initial?.student_count ? String(initial.student_count) : ""}
+          placeholder="e.g. 150"
+          required
+        />
+      </div>
+
       <div>
         <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-          College
+          Course Type
         </label>
         <select
-          name="college"
-          value={college}
-          onChange={(e) => setCollege(e.target.value)}
+          name="course_type"
+          value={courseType}
+          onChange={(e) => setCourseType(e.target.value as any)}
           required
           className={selectCls}
         >
-          <option value="">Select college…</option>
-          {COLLEGES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.name}
-            </option>
-          ))}
-          <option key="General" value="General">
-            General
-          </option>
+          <option value="departmental">Departmental (Single Department)</option>
+          <option value="shared">Shared (Specific Departments)</option>
+          <option value="general">General (All Departments)</option>
         </select>
       </div>
 
-      {/* Department scope */}
-      <div>
-        <label className="block text-xs font-mono text-slate-400 mb-2 uppercase tracking-wider">
-          Department Scope
-        </label>
-        <div className="flex gap-2 mb-3">
-          {(["all", "specific"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setDeptMode(mode)}
-              className={`
-                px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                ${deptMode === mode
-                  ? "bg-blue-600 border-blue-500 text-white"
-                  : "bg-white border-blue-300 text-blue-300 hover:border-blue-500 hover:bg-blue-600 hover:text-white"
-                }
-              `}
-            >
-              {mode === "all" ? "All Departments" : "Specific Departments"}
-            </button>
-          ))}
+      {courseType === "shared" && (
+        <div>
+          <label className="block text-xs font-mono text-slate-400 mb-2 uppercase tracking-wider">
+            Shared With Departments
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {departments.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => toggleSharedDept(d.id!)}
+                className={`
+                  px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
+                  ${
+                    selectedSharedDepts.includes(d.id!)
+                      ? "bg-blue-600 border-blue-500 text-white"
+                      : "bg-white border-blue-300 text-blue-300 hover:border-blue-500 hover:bg-blue-600 hover:text-white"
+                  }
+                `}
+              >
+                {d.code}
+              </button>
+            ))}
+          </div>
+          {selectedSharedDepts.length === 0 && (
+            <p className="text-xs text-rose-400 mt-2">
+              Select at least one other department.
+            </p>
+          )}
         </div>
-
-        {deptMode === "specific" && (
-          <>
-            <div className="flex flex-wrap gap-2">
-              {courseLevel === "all" ?
-                departments.map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => toggleDept(d.code, d.level)}
-                    className={`
-                    px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                    ${selectedDepts.includes(`${d.code} — ${d.level}`)
-                        ? "bg-blue-600 border-blue-500 text-white"
-                        : "bg-white border-blue-300 text-blue-300 hover:border-blue-500 hover:bg-blue-600 hover:text-white"
-                      }
-                  `}
-                  >
-                    {d.code} — {d.level}
-                  </button>
-                )) :
-                departments.filter((d) => d.level === courseLevel).map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => toggleDept(d.code, d.level)}
-                    className={`
-                    px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                    ${selectedDepts.includes(`${d.code} — ${d.level}`)
-                        ? "bg-blue-600 border-blue-500 text-white"
-                        : "bg-white border-blue-300 text-blue-300 hover:border-blue-500 hover:bg-blue-600 hover:text-white"
-                      }
-                  `}
-                  >
-                    {d.code} — {d.level}
-                  </button>
-                ))
-              }
-            </div>
-            {departments.length === 0 && (
-              <p className="text-xs text-amber-400 mt-1">
-                No departments found. Add one first.
-              </p>
-            )}
-            {deptMode === "specific" && selectedDepts.length === 0 && (departments.some((d) => d.level === courseLevel) || courseLevel === "all") && (
-              <p className="text-xs text-rose-400 mt-2">
-                Select at least one department.
-              </p>
-            )}
-            {deptMode === "specific" && selectedDepts.length === 0 && !departments.some((d) => d.level === courseLevel) && courseLevel !== "all" && (
-              <p className="text-xs text-rose-400 mt-2">
-                No department exists in selected level.
-              </p>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Home department (optional) */}
-      <div>
-        <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-          Home Department
-          <span className="ml-1 normal-case text-slate-600">(optional)</span>
-        </label>
-        <select
-          name="departmentId"
-          defaultValue={initial?.departmentId ?? ""}
-          className={selectCls}
-        >
-          <option value="">None</option>
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name} — {d.level}
-            </option>
-          ))}
-        </select>
-      </div>
+      )}
 
       <SubmitBtn loading={loading} />
     </form>

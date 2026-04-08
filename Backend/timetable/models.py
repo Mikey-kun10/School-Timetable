@@ -145,6 +145,11 @@ class Course(models.Model):
         related_name='courses',
         help_text="Lecturer assigned to teach this course"
     )
+    shared_session_id = models.CharField(
+        max_length=50,
+        blank=True, null=True,
+        help_text="Identifier for courses that should be taught in the same session (cross-listed)"
+    )
 
     def get_session_durations(self):
         """Return list of session durations needed per week based on hours."""

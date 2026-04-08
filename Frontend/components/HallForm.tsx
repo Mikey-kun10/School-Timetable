@@ -1,11 +1,13 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Field, SubmitBtn } from "@/components/ui/FormFields";
-import { COLLEGES } from "@/lib/types";
+import { Department, Hall } from "@/lib/types";
+import { departmentApi } from "@/lib/api";
 
 interface Props {
-  initial?: {  code: string; name: string; capacity: number; college: string };
-  onSubmit: (data: {  code: string; name: string; capacity: number; college: string }) => void;
+  initial?: Hall;
+  onSubmit: (data: Hall) => void;
   loading?: boolean;
 }
 
@@ -16,6 +18,24 @@ const selectCls = `
 `;
 
 export default function HallForm({ initial, onSubmit, loading }: Props) {
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [hallType, setHallType] = useState<"department" | "shared" | "general">(
+    initial?.hall_type ?? "department"
+  );
+  const [selectedDepts, setSelectedDepts] = useState<number[]>(
+    initial?.departments ?? []
+  );
+
+  useEffect(() => {
+    departmentApi.getAll().then(setDepartments).catch(console.error);
+  }, []);
+
+  const toggleDept = (id: number) => {
+    setSelectedDepts((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    );
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -23,9 +43,9 @@ export default function HallForm({ initial, onSubmit, loading }: Props) {
         const fd = new FormData(e.currentTarget);
         onSubmit({
           name: fd.get("name") as string,
-          code: fd.get("code") as string,
           capacity: Number(fd.get("capacity")),
-          college: fd.get("college") as string,
+          hall_type: hallType,
+          departments: hallType === "general" ? [] : selectedDepts,
         });
       }}
       className="space-y-4"
@@ -34,12 +54,7 @@ export default function HallForm({ initial, onSubmit, loading }: Props) {
         label="Hall Name"
         name="name"
         defaultValue={initial?.name}
-        required
-      />
-      <Field
-        label="Hall Code"
-        name="code"
-        defaultValue={initial?.code}
+        placeholder="e.g. Lecture Theater A"
         required
       />
       <Field
@@ -52,28 +67,60 @@ export default function HallForm({ initial, onSubmit, loading }: Props) {
         placeholder="e.g. 200"
         required
       />
-      {/* College */}
+
       <div>
         <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-          College
+          Hall Type
         </label>
         <select
-          name="college"
-          defaultValue={initial?.college ?? ""}
+          name="hall_type"
+          value={hallType}
+          onChange={(e) => setHallType(e.target.value as any)}
           required
           className={selectCls}
         >
-          <option value="">Select college…</option>
-          {COLLEGES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.name}
-            </option>
-          ))}
-          <option key="General" value="General">
-            General
-          </option>
+          <option value="department">Department-Specific</option>
+          <option value="shared">Shared (Multiple Departments)</option>
+          <option value="general">General (All Departments)</option>
         </select>
       </div>
+
+      {hallType !== "general" && (
+        <div>
+          <label className="block text-xs font-mono text-slate-400 mb-2 uppercase tracking-wider">
+            Assign Departments
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {departments.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => toggleDept(d.id!)}
+                className={`
+                  px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
+                  ${
+                    selectedDepts.includes(d.id!)
+                      ? "bg-blue-600 border-blue-500 text-white"
+                      : "bg-white border-blue-300 text-blue-300 hover:border-blue-500 hover:bg-blue-600 hover:text-white"
+                  }
+                `}
+              >
+                {d.code}
+              </button>
+            ))}
+          </div>
+          {departments.length === 0 && (
+            <p className="text-xs text-amber-400 mt-1">
+              No departments found. Add one first.
+            </p>
+          )}
+          {selectedDepts.length === 0 && hallType !== "general" && departments.length > 0 && (
+             <p className="text-xs text-rose-400 mt-2">
+             Select at least one department.
+           </p>
+          )}
+        </div>
+      )}
 
       <SubmitBtn loading={loading} />
     </form>

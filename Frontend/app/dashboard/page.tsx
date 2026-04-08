@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Users, Building2, GraduationCap } from "lucide-react";
 import Link from "next/link";
-import { courseStore, lecturerStore, hallStore, departmentStore } from "@/lib/store";
-
+import { departmentApi, lecturerApi, hallApi, courseApi } from "@/lib/api";
 
 interface Stats {
   courses: number;
@@ -55,14 +54,24 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  setStats({
-    courses:     courseStore.getAll().length,
-    lecturers:   lecturerStore.getAll().length,
-    halls:       hallStore.getAll().length,
-    departments: departmentStore.getAll().length,
-  });
-  setLoading(false);
-}, []);
+    Promise.all([
+      courseApi.getAll(),
+      lecturerApi.getAll(),
+      hallApi.getAll(),
+      departmentApi.getAll()
+    ]).then(([courses, lecturers, halls, departments]) => {
+      setStats({
+        courses: courses.length,
+        lecturers: lecturers.length,
+        halls: halls.length,
+        departments: departments.length,
+      });
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
+  }, []);
 
   return (
     <div className="space-y-8">

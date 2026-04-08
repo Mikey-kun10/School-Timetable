@@ -5,35 +5,13 @@ import DataTable from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Toast from "@/components/ui/Toast";
 import HallForm from "@/components/HallForm";
-import { hallStore } from "@/lib/store";
-import type { Hall } from "@/lib/types";
-import { COLLEGES } from "@/lib/types";
-
-function CapacityBar({ capacity }: { capacity: number }) {
-  const max = 500;
-  const pct = Math.min((capacity / max) * 100, 100);
-  const color =
-    capacity >= 300
-      ? "bg-emerald-500"
-      : capacity >= 100
-        ? "bg-amber-500"
-        : "bg-rose-500";
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 max-w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="font-mono text-sm text-slate-300">{capacity}</span>
-    </div>
-  );
-}
+import { hallApi, departmentApi } from "@/lib/api";
+import { Hall, Department } from "@/lib/types";
 
 export default function HallsPage() {
   const [data, setData] = useState<Hall[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; row?: Hall }>({
     open: false,
   });
@@ -42,28 +20,53 @@ export default function HallsPage() {
     type: "success" | "error";
   } | null>(null);
 
-  const load = useCallback(() => setData(hallStore.getAll()), []);
+  const load = useCallback(() => {
+    Promise.all([hallApi.getAll(), departmentApi.getAll()])
+      .then(([halls, depts]) => {
+        setData(halls);
+        setDepartments(depts);
+      })
+      .catch(console.error);
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
 
-  const handleSubmit = (body: Omit<Hall, "id">) => {
-    if (modal.row) {
-      hallStore.update(modal.row.id, body);
-      setToast({ message: "Hall updated.", type: "success" });
-    } else {
-      hallStore.add(body);
-      setToast({ message: "Hall added.", type: "success" });
-    }
-    setModal({ open: false });
-    load();
+  const handleSubmit = (body: Hall) => {
+    setLoading(true);
+    const apiCall = modal.row?.id
+      ? hallApi.update(modal.row.id, body)
+      : hallApi.add(body);
+
+    apiCall
+      .then(() => {
+        setToast({
+          message: `Hall ${modal.row ? "updated" : "added"}.`,
+          type: "success",
+        });
+        setModal({ open: false });
+        load();
+      })
+      .catch((err) => {
+        console.error(err);
+        setToast({ message: "An error occurred.", type: "error" });
+      })
+      .finally(() => setLoading(false));
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     if (!confirm("Delete this hall?")) return;
-    hallStore.remove(id);
-    setToast({ message: "Hall deleted.", type: "success" });
-    load();
+    hallApi
+      .remove(id)
+      .then(() => {
+        setToast({ message: "Hall deleted.", type: "success" });
+        load();
+      })
+      .catch((err) => {
+        console.error(err);
+        setToast({ message: "An error occurred.", type: "error" });
+      });
   };
 
   return (
@@ -73,28 +76,42 @@ export default function HallsPage() {
         data={data}
         columns={[
           {
-            key: "code",
-            label: "Code",
-            render: (r) => (
-              <span className="font-mono text-blue-400">{r.code}</span>
-            ),
-          },
-          {
             key: "name",
             label: "Hall Name",
+            filterable: true,
             render: (r) => (
-              <span className="font-medium text-black/30">{r.name}</span>
+              <span className="font-medium text-black/60">{r.name}</span>
             ),
           },
           {
             key: "capacity",
             label: "Capacity",
+            render: (r) => <span className="font-mono">{r.capacity}</span>,
           },
-          { key: "college", label: "College", filterable: true, filterOptions: COLLEGES.map(obj => obj.code) },
+          {
+            key: "hall_type",
+            label: "Type",
+            filterable: true,
+            filterOptions: ["department", "shared", "general"],
+            render: (r) => (
+              <span className="capitalize">{r.hall_type}</span>
+            ),
+          },
+          {
+            key: "departments",
+            label: "Departments",
+            render: (r) => {
+               if (r.hall_type === "general") return "All";
+               return r.departments.map(id => {
+                 const dept = departments.find(d => d.id === id);
+                 return dept?.code || id;
+               }).join(", ");
+            }
+          }
         ]}
         onAdd={() => setModal({ open: true })}
         onEdit={(row) => setModal({ open: true, row })}
-        onDelete={handleDelete}
+        onDelete={(id) => handleDelete(Number(id))}
       />
 
       <Modal
@@ -102,7 +119,11 @@ export default function HallsPage() {
         open={modal.open}
         onClose={() => setModal({ open: false })}
       >
-        <HallForm initial={modal.row} onSubmit={handleSubmit} />
+        <HallForm
+          initial={modal.row}
+          onSubmit={handleSubmit}
+          loading={loading}
+        />
       </Modal>
 
       {toast && (

@@ -5,62 +5,82 @@ import DataTable from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Toast from "@/components/ui/Toast";
 import CourseForm from "@/components/CourseForm";
-import { courseStore, lecturerStore } from "@/lib/store";
-import type { Course } from "@/lib/types";
-import { COLLEGES } from "@/lib/types";
+import { courseApi, lecturerApi, departmentApi } from "@/lib/api";
+import { Course, Lecturer, Department } from "@/lib/types";
 
-interface CourseWithLecturer extends Course {
+interface CourseExtended extends Course {
   lecturerName: string;
+  deptCode: string;
 }
 
 export default function CoursesPage() {
-  const [data, setData] = useState<CourseWithLecturer[]>([]);
+  const [data, setData] = useState<CourseExtended[]>([]);
+  const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState<{
     open: boolean;
-    row?: CourseWithLecturer;
+    row?: Course;
   }>({ open: false });
-  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
   } | null>(null);
 
   const load = useCallback(() => {
-    const courses = courseStore.getAll();
-    const lecturers = lecturerStore.getAll();
-
-    // Join lecturer name onto each course for display
-    const joined = courses.map((c) => ({
-      ...c,
-      lecturerName: lecturers.find((l) => l.id === c.lecturerId)?.name ?? "—",
-    }));
-
-    setData(joined);
+    Promise.all([
+      courseApi.getAll(),
+      lecturerApi.getAll(),
+      departmentApi.getAll()
+    ]).then(([courses, lecturers, depts]) => {
+      const joined = courses.map(c => ({
+        ...c,
+        lecturerName: lecturers.find(l => l.id === c.lecturer)?.first_name 
+          ? `${lecturers.find(l => l.id === c.lecturer)?.first_name} ${lecturers.find(l => l.id === c.lecturer)?.last_name}`
+          : "—",
+        deptCode: depts.find(d => d.id === c.department)?.code ?? "—",
+        shared_session_id: c.shared_session_id || "—"
+      }));
+      setData(joined);
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const handleSubmit = (body: Omit<Course, "id">) => {
-    setSaving(true);
-    if (modal.row) {
-      courseStore.update(modal.row.id, body);
-      setToast({ message: "Course updated.", type: "success" });
-    } else {
-      courseStore.add(body);
-      setToast({ message: "Course added.", type: "success" });
-    }
-    setSaving(false);
-    setModal({ open: false });
-    load();
+  const handleSubmit = (body: Course) => {
+    setLoading(true);
+    const apiCall = modal.row?.id
+      ? courseApi.update(modal.row.id, body)
+      : courseApi.add(body);
+
+    apiCall
+      .then(() => {
+        setToast({
+          message: `Course ${modal.row ? "updated" : "added"}.`,
+          type: "success",
+        });
+        setModal({ open: false });
+        load();
+      })
+      .catch((err) => {
+        console.error(err);
+        setToast({ message: "An error occurred.", type: "error" });
+      })
+      .finally(() => setLoading(false));
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     if (!confirm("Delete this course?")) return;
-    courseStore.remove(id);
-    setToast({ message: "Course deleted.", type: "success" });
-    load();
+    courseApi
+      .remove(id)
+      .then(() => {
+        setToast({ message: "Course deleted.", type: "success" });
+        load();
+      })
+      .catch((err) => {
+        console.error(err);
+        setToast({ message: "An error occurred.", type: "error" });
+      });
   };
 
   return (
@@ -70,46 +90,43 @@ export default function CoursesPage() {
         data={data}
         columns={[
           {
-            key: "courseCode",
+            key: "code",
             label: "Code",
             filterable: true,
             render: (r) => (
-              <span className="font-mono text-blue-400">{r.courseCode}</span>
+              <span className="font-mono text-blue-400">{r.code}</span>
             ),
           },
-          { key: "title", label: "Title", filterable: true },
+          { key: "name", label: "Title", filterable: true },
+          {
+            key: "deptCode",
+            label: "Dept",
+            filterable: true,
+          },
           {
             key: "level",
             label: "Level",
             render: (r) => `${r.level} Level`,
           },
-          { key: "college", label: "College", filterable: true, filterOptions: COLLEGES.map(obj => obj.code) },
           {
-            key: "duration",
-            label: "Duration",
+            key: "shared_session_id",
+            label: "Group ID",
             filterable: true,
-            filterOptions: ["100", "200", "300", "400", "500"],
-            render: (r) => `${r.duration}h`,
+          },
+          {
+            key: "hours",
+            label: "Hours",
+            render: (r) => `${r.hours}h`,
           },
           {
             key: "lecturerName",
             label: "Lecturer",
             filterable: true,
-            render: (r) => r.lecturerName,
-          },
-          {
-            key: "departments",
-            label: "Depts",
-            render: (r) => (
-              <span className="font-mono text-xs text-slate-400">
-                {r.departments.join(", ")}
-              </span>
-            ),
           },
         ]}
         onAdd={() => setModal({ open: true })}
-        onEdit={(row) => { console.log(row); setModal({ open: true, row }) }}
-        onDelete={handleDelete}
+        onEdit={(row) => setModal({ open: true, row })}
+        onDelete={(id) => handleDelete(Number(id))}
       />
 
       <Modal
@@ -118,22 +135,9 @@ export default function CoursesPage() {
         onClose={() => setModal({ open: false })}
       >
         <CourseForm
-          initial={
-            modal.row
-              ? {
-                courseCode: modal.row.courseCode,
-                title: modal.row.title,
-                duration: modal.row.duration,
-                level: modal.row.level,
-                college: modal.row.college,
-                departments: modal.row.departments,
-                lecturerId: modal.row.lecturerId,
-                departmentId: modal.row.departmentId,
-              }
-              : undefined
-          }
+          initial={modal.row}
           onSubmit={handleSubmit}
-          loading={saving}
+          loading={loading}
         />
       </Modal>
 
