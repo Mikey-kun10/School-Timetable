@@ -1,21 +1,28 @@
 from django.contrib import admin
 from .models import (
-    Department, LectureHall, Lecturer,
+    College, Department, LectureHall, Lecturer,
     LecturerUnavailability, Course, TimeSlot, TimetableEntry
 )
 
 
-@admin.register(Department)
-class DepartmentAdmin(admin.ModelAdmin):
+@admin.register(College)
+class CollegeAdmin(admin.ModelAdmin):
     list_display = ['name', 'code']
     search_fields = ['name', 'code']
+
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ['name', 'code', 'college']
+    search_fields = ['name', 'code']
+    list_filter = ['college']
 
 
 @admin.register(LectureHall)
 class LectureHallAdmin(admin.ModelAdmin):
     list_display = ['name', 'capacity', 'hall_type']
     list_filter = ['hall_type']
-    filter_horizontal = ['departments']
+    filter_horizontal = ['colleges']
 
 
 class UnavailabilityInline(admin.TabularInline):
@@ -25,8 +32,8 @@ class UnavailabilityInline(admin.TabularInline):
 
 @admin.register(Lecturer)
 class LecturerAdmin(admin.ModelAdmin):
-    list_display = ['first_name', 'last_name', 'staff_id', 'department']
-    list_filter = ['department']
+    list_display = ['first_name', 'last_name', 'staff_id', 'college']
+    list_filter = ['college']
     search_fields = ['first_name', 'last_name', 'staff_id']
     inlines = [UnavailabilityInline]
 

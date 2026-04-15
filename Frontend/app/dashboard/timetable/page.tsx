@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { CalendarDays, RefreshCw, AlertTriangle, Clock, Filter } from "lucide-react";
-import { timetableApi, departmentApi } from "@/lib/api";
-import { DAYS, LEVELS, Department } from "@/lib/types";
+import { CalendarDays, RefreshCw, AlertTriangle, Clock, Filter, Printer } from "lucide-react";
+import { timetableApi, departmentApi, ApiError } from "@/lib/api";
+import { DAYS, LEVELS, Department, TimetableEntry } from "@/lib/types";
+import Toast from "@/components/ui/Toast";
 
 const GRID_SLOTS = [
   { label: "8:00 - 9:00", start: 8 },
@@ -31,7 +32,7 @@ const LEVEL_COLORS: Record<string, string> = {
   "500": "bg-indigo-50 border-indigo-200 text-indigo-700",
 };
 
-function getLevelColor(level: any): string {
+function getLevelColor(level: number | string): string {
   return LEVEL_COLORS[String(level)] ?? "bg-slate-50 border-slate-200 text-slate-600";
 }
 
@@ -42,7 +43,7 @@ const selectCls = `
 `;
 
 export default function TimetablePage() {
-  const [entries, setEntries] = useState<any[]>([]);
+  const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [unscheduled, setUnscheduled] = useState<UnscheduledItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,27 +52,44 @@ export default function TimetablePage() {
   // Filters
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedLevel, setSelectedLevel] = useState<string>("");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    // Construct query params manually or use URLSearchParams
-    const params = new URLSearchParams();
-    if (selectedDept) params.append("department", selectedDept);
-    if (selectedLevel) params.append("level", selectedLevel);
-
-    fetch(`http://127.0.0.1:8000/api/timetable/view/?${params.toString()}`)
-      .then(res => res.json())
+    timetableApi.view()
       .then(data => {
-        setEntries(data);
-        setHasData(data.length > 0);
+        // Apply frontend filters
+        let filtered = data;
+        if (selectedDept) {
+          filtered = filtered.filter((e) => 
+            String(typeof e.course.department === 'object' ? e.course.department?.id : e.course.department) === selectedDept || 
+            (e.course.course_type === 'shared' && e.course.shared_departments?.some(d => (typeof d === 'object' ? d.id : d) === Number(selectedDept))) ||
+            e.course.course_type === 'general'
+          );
+        }
+        if (selectedLevel) {
+          filtered = filtered.filter((e) => String(e.course.level) === selectedLevel);
+        }
+        setEntries(filtered);
+        setHasData(filtered.length > 0);
       })
-      .catch(console.error)
+      .catch((err) => {
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "Failed to load timetable.", type: "error" });
+      })
       .finally(() => setLoading(false));
   }, [selectedDept, selectedLevel]);
 
   useEffect(() => {
-    departmentApi.getAll().then(setDepartments).catch(console.error);
-    load();
+    departmentApi.getAll().then(setDepartments).catch((err) => {
+      if (!(err instanceof ApiError) || err.status >= 500) {
+        console.error(err);
+      }
+    });
+    const t = setTimeout(() => load(), 0);
+    return () => clearTimeout(t);
   }, [load]);
 
   const generate = () => {
@@ -79,13 +97,23 @@ export default function TimetablePage() {
     timetableApi.generate()
       .then((res) => {
         setUnscheduled(res.unscheduled || []);
+        setToast({ message: res.message || "Timetable generated successfully.", type: "success" });
         load();
       })
-      .catch(console.error)
+      .catch((err) => {
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "Failed to generate timetable.", type: "error" });
+      })
       .finally(() => setLoading(false));
   };
 
-  const grid: Record<string, Record<number, any[]>> = {};
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const grid: Record<string, Record<number, TimetableEntry[]>> = {};
   DAYS.forEach(day => {
     grid[day] = {};
     GRID_SLOTS.forEach(slot => {
@@ -103,6 +131,21 @@ export default function TimetablePage() {
 
   return (
     <div className="space-y-6">
+      {/* Print-only Header */}
+      <div className="hidden print:block mb-8 border-b-2 border-black pb-4">
+        <h1 className="text-3xl font-bold uppercase tracking-tighter">
+          University Timetable Schedule
+        </h1>
+        <div className="flex gap-4 mt-2 text-sm font-mono">
+          <p>Generated: {new Date().toLocaleDateString()}</p>
+          {selectedDept && (
+            <p>Department: {departments.find(d => String(d.id) === selectedDept)?.name}</p>
+          )}
+          {selectedLevel && (
+            <p>Level: {selectedLevel}L</p>
+          )}
+        </div>
+      </div>
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -114,7 +157,7 @@ export default function TimetablePage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 no-print">
           <div className="flex items-center gap-2 bg-black/5 p-1.5 rounded-xl border border-black/5">
             <div className="flex items-center gap-1.5 px-2 text-black/40">
               <Filter size={14} />
@@ -150,11 +193,23 @@ export default function TimetablePage() {
             className="
               flex items-center gap-2 px-4 py-2 rounded-lg text-sm
               font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50
-              text-white transition-all shadow-md shadow-blue-600/20 active:scale-95
+              text-white transition-all shadow-md shadow-blue-600/20 active:scale-95 no-print
             "
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             {loading ? "Generating..." : "Generate"}
+          </button>
+
+          <button
+            onClick={handlePrint}
+            className="
+              flex items-center gap-2 px-4 py-2 rounded-lg text-sm
+              font-medium bg-white border border-black/10 hover:bg-black/5
+              text-black/60 transition-all active:scale-95 no-print
+            "
+          >
+            <Printer size={14} />
+            Print
           </button>
         </div>
       </div>
@@ -220,7 +275,7 @@ export default function TimetablePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
-                {DAYS.map((day, di) => (
+                {DAYS.map((day) => (
                   <tr key={day} className={`group hover:bg-blue-50/30 transition-colors`}>
                     <td className="px-4 py-6 font-mono text-[11px] font-black text-slate-400 whitespace-nowrap align-middle sticky left-0 bg-white group-hover:bg-blue-50/30 border-r border-black/5 z-20 transition-colors uppercase">
                       {day.slice(0, 3)}
@@ -275,6 +330,14 @@ export default function TimetablePage() {
             </table>
           </div>
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
       )}
     </div>
   );

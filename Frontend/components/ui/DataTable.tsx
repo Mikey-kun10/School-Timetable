@@ -9,19 +9,20 @@ interface Column<T> {
   render?: (row: T) => React.ReactNode;
   filterable?: boolean;        // opt-in per column
   filterOptions?: string[];    // if provided, renders a dropdown instead of text input
+  filterValue?: (row: T) => string | string[]; // custom value for filtering
 }
 
-interface Props<T extends { id: string }> {
+interface Props<T extends { id?: number | string }> {
   title: string;
   columns: Column<T>[];
   data: T[];
   onAdd: () => void;
   onEdit: (row: T) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: NonNullable<T["id"]>) => void;
   loading?: boolean;
 }
 
-export default function DataTable<T extends { id: string }>({
+export default function DataTable<T extends { id?: number | string }>({
   title, columns, data, onAdd, onEdit, onDelete, loading,
 }: Props<T>) {
   const [search, setSearch] = useState("");
@@ -60,7 +61,15 @@ export default function DataTable<T extends { id: string }>({
       // Per-column filters
       for (const [key, value] of Object.entries(filters)) {
         if (!value) continue;
-        const raw = (row as Record<string, unknown>)[key];
+        const col = columns.find((c) => String(c.key) === key);
+        let raw: unknown;
+
+        if (col?.filterValue) {
+          raw = col.filterValue(row);
+        } else {
+          raw = (row as Record<string, unknown>)[key];
+        }
+
         const cellStr = Array.isArray(raw)
           ? raw.join(", ").toLowerCase()
           : String(raw ?? "").toLowerCase();
@@ -69,7 +78,7 @@ export default function DataTable<T extends { id: string }>({
 
       return true;
     });
-  }, [data, search, filters]);
+  }, [data, search, filters, columns]);
 
   // const filtered = data.filter((row) =>
   //   Object.values(row as object)
@@ -322,7 +331,7 @@ export default function DataTable<T extends { id: string }>({
                           <Pencil size={13} />
                         </button>
                         <button
-                          onClick={() => onDelete(row.id)}
+                          onClick={() => onDelete(row.id as NonNullable<T["id"]>)}
                           className="p-1.5 rounded-md text-black/30 hover:text-blue-500 hover:bg-blue-400/30 transition-colors"
                         >
                           <Trash2 size={13} />

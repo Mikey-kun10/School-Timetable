@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Field, SubmitBtn } from "@/components/ui/FormFields";
-import { Department, Hall } from "@/lib/types";
-import { departmentApi } from "@/lib/api";
+import { College, Hall } from "@/lib/types";
+import { collegeApi } from "@/lib/api";
 
 interface Props {
   initial?: Hall;
@@ -18,22 +18,28 @@ const selectCls = `
 `;
 
 export default function HallForm({ initial, onSubmit, loading }: Props) {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [hallType, setHallType] = useState<"department" | "shared" | "general">(
-    initial?.hall_type ?? "department"
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [hallType, setHallType] = useState<"college" | "shared" | "general">(
+    initial?.hall_type ?? "college"
   );
-  const [selectedDepts, setSelectedDepts] = useState<number[]>(
-    initial?.departments ?? []
+  const [selectedColleges, setSelectedColleges] = useState<number[]>(
+    initial?.colleges?.map(c => (c && typeof c === 'object') ? c.id! : (c as number)) ?? []
   );
 
   useEffect(() => {
-    departmentApi.getAll().then(setDepartments).catch(console.error);
+    collegeApi.getAll().then(setColleges).catch(console.error);
   }, []);
 
-  const toggleDept = (id: number) => {
-    setSelectedDepts((prev) =>
-      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
-    );
+  const toggleCollege = (id: number) => {
+    if (hallType === "college") {
+      // College-Specific: radio-style — only one college allowed
+      setSelectedColleges((prev) => (prev.includes(id) ? [] : [id]));
+    } else {
+      // Shared: multi-select
+      setSelectedColleges((prev) =>
+        prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+      );
+    }
   };
 
   return (
@@ -41,11 +47,16 @@ export default function HallForm({ initial, onSubmit, loading }: Props) {
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        if (hallType !== "general" && selectedColleges.length === 0) {
+          alert("Please select at least one college for this hall.");
+          return;
+        }
+
         onSubmit({
           name: fd.get("name") as string,
           capacity: Number(fd.get("capacity")),
           hall_type: hallType,
-          departments: hallType === "general" ? [] : selectedDepts,
+          colleges: hallType === "general" ? [] : selectedColleges,
         });
       }}
       className="space-y-4"
@@ -75,48 +86,51 @@ export default function HallForm({ initial, onSubmit, loading }: Props) {
         <select
           name="hall_type"
           value={hallType}
-          onChange={(e) => setHallType(e.target.value as any)}
+          onChange={(e) => {
+            setHallType(e.target.value as "college" | "shared" | "general");
+            setSelectedColleges([]); // clear selection when type switches
+          }}
           required
           className={selectCls}
         >
-          <option value="department">Department-Specific</option>
-          <option value="shared">Shared (Multiple Departments)</option>
-          <option value="general">General (All Departments)</option>
+          <option value="college">College-Specific</option>
+          <option value="shared">Shared (Multiple Colleges)</option>
+          <option value="general">General (All Colleges)</option>
         </select>
       </div>
 
       {hallType !== "general" && (
         <div>
           <label className="block text-xs font-mono text-slate-400 mb-2 uppercase tracking-wider">
-            Assign Departments
+            Assign Colleges
           </label>
           <div className="flex flex-wrap gap-2">
-            {departments.map((d) => (
+            {colleges.map((c) => (
               <button
-                key={d.id}
+                key={c.id}
                 type="button"
-                onClick={() => toggleDept(d.id!)}
+                onClick={() => toggleCollege(c.id!)}
                 className={`
                   px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
                   ${
-                    selectedDepts.includes(d.id!)
+                    selectedColleges.includes(c.id!)
                       ? "bg-blue-600 border-blue-500 text-white"
                       : "bg-white border-blue-300 text-blue-300 hover:border-blue-500 hover:bg-blue-600 hover:text-white"
                   }
                 `}
               >
-                {d.code}
+                {c.code}
               </button>
             ))}
           </div>
-          {departments.length === 0 && (
+          {colleges.length === 0 && (
             <p className="text-xs text-amber-400 mt-1">
-              No departments found. Add one first.
+              No colleges found. Add one first.
             </p>
           )}
-          {selectedDepts.length === 0 && hallType !== "general" && departments.length > 0 && (
+          {selectedColleges.length === 0 && colleges.length > 0 && (
              <p className="text-xs text-rose-400 mt-2">
-             Select at least one department.
+             Select at least one college.
            </p>
           )}
         </div>

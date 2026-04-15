@@ -25,3 +25,20 @@
     scrollbar-color: #2b7fff #ffffff;
   }
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  @page {
+    size: landscape;
+    margin: 1cm;
+  }
+
+  body {
+    background: white !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

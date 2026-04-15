@@ -4,14 +4,18 @@ from rest_framework.response import Response
 from django.db.models import Q
 import pandas as pd
 from .models import (
-    Department, LectureHall, Lecturer, Course,
+    College, Department, LectureHall, Lecturer, Course,
     TimeSlot, TimetableEntry, LEVEL_CHOICES
 )
 from .serializers import (
-    DepartmentSerializer, LectureHallSerializer, LecturerSerializer,
+    CollegeSerializer, DepartmentSerializer, LectureHallSerializer, LecturerSerializer,
     CourseSerializer, TimetableEntrySerializer
 )
 from .scheduler import generate_timetable
+
+class CollegeViewSet(viewsets.ModelViewSet):
+    queryset = College.objects.all()
+    serializer_class = CollegeSerializer
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
@@ -79,51 +83,79 @@ def api_timetable_view(request):
 @api_view(['POST'])
 def api_bulk_upload(request):
     try:
+        if 'colleges_file' in request.FILES:
+            try:
+                df = pd.read_csv(request.FILES['colleges_file']) if request.FILES['colleges_file'].name.endswith('.csv') else pd.read_excel(request.FILES['colleges_file'])
+                for _, row in df.iterrows():
+                    if pd.notna(row.get('code')) and pd.notna(row.get('name')):
+                        College.objects.get_or_create(code=str(row['code']).strip(), defaults={'name': str(row['name']).strip()})
+            except Exception as e:
+                return Response({'success': False, 'message': f"Error in Colleges file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
         if 'departments_file' in request.FILES:
-            df = pd.read_csv(request.FILES['departments_file']) if request.FILES['departments_file'].name.endswith('.csv') else pd.read_excel(request.FILES['departments_file'])
-            for _, row in df.iterrows():
-                if pd.notna(row.get('code')) and pd.notna(row.get('name')):
-                    Department.objects.get_or_create(code=str(row['code']).strip(), defaults={'name': str(row['name']).strip()})
+            try:
+                df = pd.read_csv(request.FILES['departments_file']) if request.FILES['departments_file'].name.endswith('.csv') else pd.read_excel(request.FILES['departments_file'])
+                for _, row in df.iterrows():
+                    if pd.notna(row.get('code')) and pd.notna(row.get('name')):
+                        college = College.objects.filter(code=str(row['college_code']).strip()).first() if pd.notna(row.get('college_code')) else None
+                        Department.objects.get_or_create(code=str(row['code']).strip(), defaults={
+                            'name': str(row['name']).strip(),
+                            'college': college
+                        })
+            except Exception as e:
+                return Response({'success': False, 'message': f"Error in Departments file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         
         if 'halls_file' in request.FILES:
-            df = pd.read_csv(request.FILES['halls_file']) if request.FILES['halls_file'].name.endswith('.csv') else pd.read_excel(request.FILES['halls_file'])
-            for _, row in df.iterrows():
-                if pd.notna(row.get('name')):
-                    LectureHall.objects.get_or_create(
-                        name=str(row['name']).strip(),
-                        defaults={'capacity': int(row['capacity']), 'hall_type': row.get('hall_type', 'department')}
-                    )
+            try:
+                df = pd.read_csv(request.FILES['halls_file']) if request.FILES['halls_file'].name.endswith('.csv') else pd.read_excel(request.FILES['halls_file'])
+                for _, row in df.iterrows():
+                    if pd.notna(row.get('name')):
+                        name = str(row['name']).strip()
+                        if not LectureHall.objects.filter(name__iexact=name).exists():
+                            LectureHall.objects.create(
+                                name=name,
+                                capacity=int(row['capacity']),
+                                hall_type=row.get('hall_type', 'college')
+                            )
+            except Exception as e:
+                return Response({'success': False, 'message': f"Error in Halls file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         
         if 'lecturers_file' in request.FILES:
-            df = pd.read_csv(request.FILES['lecturers_file']) if request.FILES['lecturers_file'].name.endswith('.csv') else pd.read_excel(request.FILES['lecturers_file'])
-            for _, row in df.iterrows():
-                if pd.notna(row.get('staff_id')):
-                    dept = Department.objects.filter(code=str(row['department_code']).strip()).first() if pd.notna(row.get('department_code')) else None
-                    if dept:
-                        Lecturer.objects.get_or_create(staff_id=str(row['staff_id']).strip(), defaults={
-                            'first_name': str(row['first_name']).strip(),
-                            'last_name': str(row['last_name']).strip(),
-                            'department': dept,
-                            'email': str(row.get('email', '')).strip() if pd.notna(row.get('email')) else ''
-                        })
+            try:
+                df = pd.read_csv(request.FILES['lecturers_file']) if request.FILES['lecturers_file'].name.endswith('.csv') else pd.read_excel(request.FILES['lecturers_file'])
+                for _, row in df.iterrows():
+                    if pd.notna(row.get('staff_id')):
+                        col = College.objects.filter(code=str(row['college_code']).strip()).first() if pd.notna(row.get('college_code')) else None
+                        if col:
+                            Lecturer.objects.get_or_create(staff_id=str(row['staff_id']).strip(), defaults={
+                                'first_name': str(row['first_name']).strip(),
+                                'last_name': str(row['last_name']).strip(),
+                                'college': col,
+                                'email': str(row.get('email', '')).strip() if pd.notna(row.get('email')) else ''
+                            })
+            except Exception as e:
+                return Response({'success': False, 'message': f"Error in Lecturers file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
         if 'courses_file' in request.FILES:
-            df = pd.read_csv(request.FILES['courses_file']) if request.FILES['courses_file'].name.endswith('.csv') else pd.read_excel(request.FILES['courses_file'])
-            for _, row in df.iterrows():
-                if pd.notna(row.get('code')):
-                    dept = Department.objects.filter(code=str(row['department_code']).strip()).first() if pd.notna(row.get('department_code')) else None
-                    lecturer = Lecturer.objects.filter(staff_id=str(row['lecturer_staff_id']).strip()).first() if pd.notna(row.get('lecturer_staff_id')) else None
-                    if dept:
-                        Course.objects.get_or_create(code=str(row['code']).strip(), defaults={
-                            'name': str(row['name']).strip(),
-                            'department': dept,
-                            'level': int(row['level']),
-                            'course_type': str(row.get('course_type', 'departmental')).strip(),
-                            'units': int(row['units']),
-                            'hours': int(row.get('hours', 2)),
-                            'student_count': int(row['student_count']),
-                            'lecturer': lecturer
-                        })
+            try:
+                df = pd.read_csv(request.FILES['courses_file']) if request.FILES['courses_file'].name.endswith('.csv') else pd.read_excel(request.FILES['courses_file'])
+                for _, row in df.iterrows():
+                    if pd.notna(row.get('code')):
+                        dept = Department.objects.filter(code=str(row['department_code']).strip()).first() if pd.notna(row.get('department_code')) else None
+                        lecturer = Lecturer.objects.filter(staff_id=str(row['lecturer_staff_id']).strip()).first() if pd.notna(row.get('lecturer_staff_id')) else None
+                        if dept:
+                            Course.objects.get_or_create(code=str(row['code']).strip(), defaults={
+                                'name': str(row['name']).strip(),
+                                'department': dept,
+                                'level': int(row['level']),
+                                'course_type': str(row.get('course_type', 'departmental')).strip(),
+                                'units': int(row['units']),
+                                'hours': int(row.get('hours', 2)),
+                                'student_count': int(row['student_count']),
+                                'lecturer': lecturer
+                            })
+            except Exception as e:
+                return Response({'success': False, 'message': f"Error in Courses file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         
         return Response({'success': True, 'message': 'Bulk upload processed successfully!'})
         

@@ -17,7 +17,7 @@ export default function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const title = TITLES[pathname] ?? "Dashboard";
 
   return (
-    <header className="flex items-center gap-4 px-4 md:px-6 lg:px-8 h-14 border-b border-blue-400 bg-white shrink-0">
+    <header className="flex items-center gap-4 px-4 md:px-6 lg:px-8 h-14 border-b border-blue-400 bg-white shrink-0 no-print">
       <button
         onClick={onMenuClick}
         className="lg:hidden rounded-[50%] h-9 w-9 flex items-center justify-center leading-none text-blue-500 hover:bg-blue-400/10  transition-colors"

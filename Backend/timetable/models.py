@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 
 
 DAYS_OF_WEEK = [
@@ -19,9 +19,9 @@ LEVEL_CHOICES = [
 ]
 
 HALL_TYPE_CHOICES = [
-    ('department', 'Department-Specific'),
-    ('shared', 'Shared (Multiple Departments)'),
-    ('general', 'General (All Departments)'),
+    ('college', 'College-Specific'),
+    ('shared', 'Shared (Multiple Colleges)'),
+    ('general', 'General (All Colleges)'),
 ]
 
 COURSE_TYPE_CHOICES = [
@@ -31,7 +31,7 @@ COURSE_TYPE_CHOICES = [
 ]
 
 
-class Department(models.Model):
+class College(models.Model):
     name = models.CharField(max_length=200, unique=True)
     code = models.CharField(max_length=20, unique=True)
 
@@ -42,8 +42,24 @@ class Department(models.Model):
         ordering = ['name']
 
 
-class LectureHall(models.Model):
+class Department(models.Model):
     name = models.CharField(max_length=200, unique=True)
+    code = models.CharField(max_length=20, unique=True)
+    college = models.ForeignKey(
+        College,
+        on_delete=models.CASCADE,
+        related_name='departments',
+    )
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+    class Meta:
+        ordering = ['name']
+
+
+class LectureHall(models.Model):
+    name = models.CharField(max_length=200)
     capacity = models.PositiveIntegerField(
         validators=[MinValueValidator(1)],
         help_text="Maximum number of students the hall can hold"
@@ -51,13 +67,13 @@ class LectureHall(models.Model):
     hall_type = models.CharField(
         max_length=20,
         choices=HALL_TYPE_CHOICES,
-        default='department',
+        default='college',
     )
-    departments = models.ManyToManyField(
-        Department,
+    colleges = models.ManyToManyField(
+        College,
         blank=True,
         related_name='lecture_halls',
-        help_text="Departments that can use this hall (for department-specific or shared halls)"
+        help_text="Colleges that can use this hall (for college-specific or shared halls)"
     )
 
     def __str__(self):
@@ -71,8 +87,8 @@ class Lecturer(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     staff_id = models.CharField(max_length=50, unique=True)
-    department = models.ForeignKey(
-        Department,
+    college = models.ForeignKey(
+        College,
         on_delete=models.CASCADE,
         related_name='lecturers'
     )
@@ -101,12 +117,23 @@ class LecturerUnavailability(models.Model):
 
 class Course(models.Model):
     name = models.CharField(max_length=200)
-    code = models.CharField(max_length=20, unique=True)
+    code = models.CharField(
+        max_length=20,
+        unique=True,
+        validators=[
+            RegexValidator(
+                regex='^(?=.*[a-zA-Z])(?=.*\\d).+$',
+                message='Course code must contain both letters and numbers.',
+                code='invalid_course_code'
+            )
+        ]
+    )
     department = models.ForeignKey(
         Department,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
         related_name='courses',
-        help_text="Primary/owning department"
+        help_text="Primary/owning department (optional for general courses)"
     )
     level = models.PositiveIntegerField(
         choices=LEVEL_CHOICES,
@@ -140,8 +167,7 @@ class Course(models.Model):
     )
     lecturer = models.ForeignKey(
         Lecturer,
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
+        on_delete=models.CASCADE,
         related_name='courses',
         help_text="Lecturer assigned to teach this course"
     )
@@ -175,10 +201,20 @@ class Course(models.Model):
             return Department.objects.all()
         elif self.course_type == 'shared':
             dept_ids = list(self.shared_departments.values_list('id', flat=True))
-            dept_ids.append(self.department_id)
+            if self.department_id:
+                dept_ids.append(self.department_id)
             return Department.objects.filter(id__in=dept_ids)
         else:
-            return Department.objects.filter(id=self.department_id)
+            # departmental — primary dept may be null for cross-college courses
+            if self.department_id:
+                return Department.objects.filter(id=self.department_id)
+            return Department.objects.none()
+
+    def save(self, *args, **kwargs):
+        if self.shared_session_id:
+            cleaned = self.shared_session_id.strip()
+            self.shared_session_id = cleaned if cleaned else None
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.code} - {self.name}"

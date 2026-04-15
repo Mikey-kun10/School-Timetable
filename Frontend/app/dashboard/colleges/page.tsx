@@ -4,14 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import DataTable from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Toast from "@/components/ui/Toast";
-import DepartmentForm from "@/components/DepartmentForm";
-import { departmentApi, ApiError } from "@/lib/api";
-import { Department } from "@/lib/types";
+import CollegeForm from "@/components/CollegeForm";
+import { collegeApi, ApiError } from "@/lib/api";
+import { College } from "@/lib/types";
 
-export default function DepartmentsPage() {
-  const [data, setData] = useState<Department[]>([]);
+export default function CollegesPage() {
+  const [data, setData] = useState<College[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState<{ open: boolean; row?: Department }>({
+  const [modal, setModal] = useState<{ open: boolean; row?: College }>({
     open: false,
   });
   const [toast, setToast] = useState<{
@@ -20,7 +20,7 @@ export default function DepartmentsPage() {
   } | null>(null);
 
   const load = useCallback(() => {
-    departmentApi.getAll().then(setData).catch((err) => {
+    collegeApi.getAll().then(setData).catch((err) => {
       if (!(err instanceof ApiError) || err.status >= 500) {
         console.error(err);
       }
@@ -31,16 +31,16 @@ export default function DepartmentsPage() {
     load();
   }, [load]);
 
-  const handleSubmit = (body: Department) => {
+  const handleSubmit = (body: College) => {
     setLoading(true);
     const apiCall = modal.row?.id
-      ? departmentApi.update(modal.row.id, body)
-      : departmentApi.add(body);
+      ? collegeApi.update(modal.row.id, body)
+      : collegeApi.add(body);
 
     apiCall
       .then(() => {
         setToast({
-          message: `Department ${modal.row ? "updated" : "added"}.`,
+          message: `College ${modal.row ? "updated" : "added"}.`,
           type: "success",
         });
         setModal({ open: false });
@@ -56,11 +56,11 @@ export default function DepartmentsPage() {
   };
 
   const handleDelete = (id: number) => {
-    if (!confirm("Delete this department?")) return;
-    departmentApi
+    if (!confirm("Delete this college?")) return;
+    collegeApi
       .remove(id)
       .then(() => {
-        setToast({ message: "Department deleted.", type: "success" });
+        setToast({ message: "College deleted.", type: "success" });
         load();
       })
       .catch((err) => {
@@ -74,7 +74,7 @@ export default function DepartmentsPage() {
   return (
     <>
       <DataTable
-        title="Departments"
+        title="Colleges"
         data={data}
         columns={[
           {
@@ -93,11 +93,11 @@ export default function DepartmentsPage() {
       />
 
       <Modal
-        title={modal.row ? "Edit Department" : "Add Department"}
+        title={modal.row ? "Edit College" : "Add College"}
         open={modal.open}
         onClose={() => setModal({ open: false })}
       >
-        <DepartmentForm
+        <CollegeForm
           initial={modal.row}
           onSubmit={handleSubmit}
           loading={loading}

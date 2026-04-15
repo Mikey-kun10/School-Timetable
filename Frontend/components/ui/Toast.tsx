@@ -20,7 +20,7 @@ export default function Toast({ message, type, onDismiss }: ToastProps) {
   return (
     <div
       className={`
-        fixed bottom-6 right-6 z-50 flex items-center gap-3
+        fixed bottom-6 right-6 z-50 flex items-center gap-3 no-print
         px-4 py-3 rounded-lg border text-sm font-medium shadow-xl
         transition-all duration-300
         ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"}

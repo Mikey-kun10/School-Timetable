@@ -5,12 +5,12 @@ import DataTable from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Toast from "@/components/ui/Toast";
 import HallForm from "@/components/HallForm";
-import { hallApi, departmentApi } from "@/lib/api";
-import { Hall, Department } from "@/lib/types";
+import { hallApi, collegeApi, ApiError } from "@/lib/api";
+import { Hall, College } from "@/lib/types";
 
 export default function HallsPage() {
   const [data, setData] = useState<Hall[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [colleges, setColleges] = useState<College[]>([]);
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; row?: Hall }>({
     open: false,
@@ -21,12 +21,16 @@ export default function HallsPage() {
   } | null>(null);
 
   const load = useCallback(() => {
-    Promise.all([hallApi.getAll(), departmentApi.getAll()])
-      .then(([halls, depts]) => {
+    Promise.all([hallApi.getAll(), collegeApi.getAll()])
+      .then(([halls, cols]) => {
         setData(halls);
-        setDepartments(depts);
+        setColleges(cols);
       })
-      .catch(console.error);
+      .catch((err) => {
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -49,8 +53,10 @@ export default function HallsPage() {
         load();
       })
       .catch((err) => {
-        console.error(err);
-        setToast({ message: "An error occurred.", type: "error" });
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "An error occurred.", type: "error" });
       })
       .finally(() => setLoading(false));
   };
@@ -64,8 +70,10 @@ export default function HallsPage() {
         load();
       })
       .catch((err) => {
-        console.error(err);
-        setToast({ message: "An error occurred.", type: "error" });
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "An error occurred.", type: "error" });
       });
   };
 
@@ -92,21 +100,34 @@ export default function HallsPage() {
             key: "hall_type",
             label: "Type",
             filterable: true,
-            filterOptions: ["department", "shared", "general"],
+            filterOptions: ["college", "shared", "general"],
             render: (r) => (
               <span className="capitalize">{r.hall_type}</span>
             ),
           },
           {
-            key: "departments",
-            label: "Departments",
+            key: "colleges",
+            label: "Colleges",
+            filterable: true,
+            filterOptions: colleges.map((c) => c.code),
+            filterValue: (r) => {
+              if (r.hall_type === "general") return colleges.map((c) => c.code);
+              return r.colleges.map((c) => {
+                const id = typeof c === "object" ? c.id : c;
+                const col = colleges.find((col) => col.id === id);
+                return col?.code ?? String(id);
+              });
+            },
             render: (r) => {
-               if (r.hall_type === "general") return "All";
-               return r.departments.map(id => {
-                 const dept = departments.find(d => d.id === id);
-                 return dept?.code || id;
-               }).join(", ");
-            }
+              if (r.hall_type === "general") return "All";
+              return r.colleges
+                .map((c) => {
+                  const id = typeof c === "object" ? c.id : c;
+                  const col = colleges.find((col) => col.id === id);
+                  return col?.code || String(id);
+                })
+                .join(", ");
+            },
           }
         ]}
         onAdd={() => setModal({ open: true })}

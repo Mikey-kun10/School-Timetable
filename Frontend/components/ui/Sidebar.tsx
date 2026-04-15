@@ -9,6 +9,7 @@ import {
 
 const NAV = [
   { href: "/dashboard",             label: "Overview",    icon: LayoutGrid    },
+  { href: "/dashboard/colleges",    label: "Colleges",    icon: Building2     },
   { href: "/dashboard/departments", label: "Departments", icon: Building2     },
   { href: "/dashboard/lecturers",   label: "Lecturers",   icon: Users         },
   { href: "/dashboard/halls",       label: "Halls",       icon: GraduationCap },
@@ -30,7 +31,7 @@ export default function Sidebar({ open, onClose }: Props) {
         fixed inset-y-0 left-0 z-30 flex w-64 flex-col
         bg-blue-500 border-r border-blue-400
         transition-transform duration-300 ease-in-out
-        lg:relative lg:translate-x-0 lg:z-auto
+        lg:relative lg:translate-x-0 lg:z-auto no-print
         ${open ? "translate-x-0" : "-translate-x-full"}
       `}
     >

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { LEVELS, Course, Department, Lecturer } from "@/lib/types";
 import { Field, SubmitBtn } from "@/components/ui/FormFields";
+import LecturerCombobox from "@/components/ui/LecturerCombobox";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { departmentApi, lecturerApi } from "@/lib/api";
 
 interface Props {
@@ -24,7 +26,17 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
     initial?.course_type ?? "departmental"
   );
   const [selectedSharedDepts, setSelectedSharedDepts] = useState<number[]>(
-    initial?.shared_departments ?? []
+    initial?.shared_departments?.map(d => (d && typeof d === "object") ? d.id! : (d as number)) ?? []
+  );
+  const [selectedLecturer, setSelectedLecturer] = useState<number | null>(
+    initial?.lecturer && typeof initial.lecturer === "object"
+      ? initial.lecturer.id!
+      : (initial?.lecturer as number) ?? null
+  );
+  const [selectedDept, setSelectedDept] = useState<number | null>(
+    initial?.department && typeof initial.department === "object"
+      ? initial.department.id!
+      : (initial?.department as number) ?? null
   );
 
   useEffect(() => {
@@ -47,18 +59,41 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        
+        const code = (fd.get("code") as string).toUpperCase();
+        const codeRegex = /^(?=.*[A-Z])(?=.*\d).+$/;
+        if (!codeRegex.test(code)) {
+          alert("Course code must contain both letters and numbers (e.g., CSC301).");
+          return;
+        }
+
+        if (!selectedLecturer) {
+          alert("Please select a lecturer.");
+          return;
+        }
+
+        if (courseType !== "general" && !selectedDept) {
+          alert("Please select a primary department.");
+          return;
+        }
+
+        if (courseType === "shared" && selectedSharedDepts.length === 0) {
+          alert("Please select at least one shared department.");
+          return;
+        }
+
         onSubmit({
           name: fd.get("name") as string,
           code: (fd.get("code") as string).toUpperCase(),
-          department: Number(fd.get("department")),
+          department: courseType === "general" ? null : selectedDept,
           level: Number(fd.get("level")),
           course_type: courseType,
           shared_departments: courseType === "shared" ? selectedSharedDepts : [],
           units: Number(fd.get("units")),
           hours: Number(fd.get("hours")),
           student_count: Number(fd.get("student_count")),
-          lecturer: fd.get("lecturer") ? Number(fd.get("lecturer")) : null,
-          shared_session_id: fd.get("shared_session_id") as string || null,
+          lecturer: selectedLecturer!,
+          shared_session_id: (fd.get("shared_session_id") as string || "").trim() || null,
         });
       }}
       className="space-y-4"
@@ -107,43 +142,16 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-            Primary Department
-          </label>
-          <select
-            name="department"
-            defaultValue={initial?.department ?? ""}
-            required
-            className={selectCls}
-          >
-            <option value="">Select…</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-            Lecturer
-          </label>
-          <select
-            name="lecturer"
-            defaultValue={initial?.lecturer ?? ""}
-            className={selectCls}
-          >
-            <option value="">Select…</option>
-            {lecturers.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.first_name} {l.last_name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
+          Lecturer
+        </label>
+        <LecturerCombobox
+          lecturers={lecturers}
+          value={selectedLecturer}
+          onChange={setSelectedLecturer}
+          required
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -171,21 +179,38 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
         />
       </div>
 
-      <div>
-        <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-          Course Type
-        </label>
-        <select
-          name="course_type"
-          value={courseType}
-          onChange={(e) => setCourseType(e.target.value as any)}
-          required
-          className={selectCls}
-        >
-          <option value="departmental">Departmental (Single Department)</option>
-          <option value="shared">Shared (Specific Departments)</option>
-          <option value="general">General (All Departments)</option>
-        </select>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
+            Course Type
+          </label>
+          <select
+            name="course_type"
+            value={courseType}
+            onChange={(e) => setCourseType(e.target.value as "departmental" | "shared" | "general")}
+            required
+            className={selectCls}
+          >
+            <option value="departmental">Departmental (Single Department)</option>
+            <option value="shared">Shared (Specific Departments)</option>
+            <option value="general">General (All Departments)</option>
+          </select>
+        </div>
+
+        {courseType !== "general" && (
+          <div>
+            <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
+              {courseType === "departmental" ? "Department" : "Primary Department"}
+            </label>
+            <SearchableSelect
+              items={departments}
+              value={selectedDept}
+              onChange={setSelectedDept}
+              required
+              placeholder="Search department by name or code…"
+            />
+          </div>
+        )}
       </div>
 
       {courseType === "shared" && (

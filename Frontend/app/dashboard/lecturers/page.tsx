@@ -5,7 +5,7 @@ import DataTable from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Toast from "@/components/ui/Toast";
 import LecturerForm from "@/components/LecturerForm";
-import { lecturerApi } from "@/lib/api";
+import { lecturerApi, ApiError } from "@/lib/api";
 import { Lecturer, DAYS } from "@/lib/types";
 
 const DAY_SHORT: Record<string, string> = {
@@ -40,7 +40,11 @@ export default function LecturersPage() {
   } | null>(null);
 
   const load = useCallback(() => {
-    lecturerApi.getAll().then(setData).catch(console.error);
+    lecturerApi.getAll().then(setData).catch((err) => {
+      if (!(err instanceof ApiError) || err.status >= 500) {
+        console.error(err);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -63,8 +67,10 @@ export default function LecturersPage() {
         load();
       })
       .catch((err) => {
-        console.error(err);
-        setToast({ message: "An error occurred.", type: "error" });
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "An error occurred.", type: "error" });
       })
       .finally(() => setLoading(false));
   };
@@ -78,8 +84,10 @@ export default function LecturersPage() {
         load();
       })
       .catch((err) => {
-        console.error(err);
-        setToast({ message: "An error occurred.", type: "error" });
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "An error occurred.", type: "error" });
       });
   };
 
@@ -99,6 +107,7 @@ export default function LecturersPage() {
             key: "first_name",
             label: "Name",
             filterable: true,
+            filterValue: (r) => `${r.first_name} ${r.last_name}`,
             render: (r) => (
               <span className="font-medium text-black/60">
                 {r.first_name} {r.last_name}
@@ -110,7 +119,7 @@ export default function LecturersPage() {
             key: "unavailable_days",
             label: "Available Days",
             render: (r) => {
-              const unavailable = r.unavailable_days?.map((d) => d.day) || [];
+              const unavailable = r.unavailable_days?.map((d: { day: string }) => d.day) || [];
               const available = DAYS.filter((d) => !unavailable.includes(d));
               return (
                 <div className="flex flex-wrap gap-1">

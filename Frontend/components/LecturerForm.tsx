@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Day, DAYS, Department } from "@/lib/types";
+import { DAYS, College } from "@/lib/types";
 import { Field, SubmitBtn } from "@/components/ui/FormFields";
-import { departmentApi } from "@/lib/api";
+import { collegeApi } from "@/lib/api";
 
 interface LecturerData {
   id?: number;
   first_name: string;
   last_name: string;
   staff_id: string;
-  department: number;
+  college: number | College;
   email: string;
   unavailable_days_input?: string[];
   unavailable_days?: { id: number, day: string }[];
@@ -29,15 +29,20 @@ const selectCls = `
 `;
 
 export default function LecturerForm({ initial, onSubmit, loading }: Props) {
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [colleges, setColleges] = useState<College[]>([]);
   // We manage the UI state as available days for user friendliness
   const currentUnavailable = initial?.unavailable_days?.map(d => d.day) || [];
   const [availableDays, setAvailableDays] = useState<string[]>(
     initial ? DAYS.filter(d => !currentUnavailable.includes(d)) : DAYS
   );
+  const [selectedCollege, setSelectedCollege] = useState<string>(
+    initial?.college && typeof initial.college === "object"
+      ? String(initial.college.id)
+      : initial?.college ? String(initial.college) : ""
+  );
 
   useEffect(() => {
-    departmentApi.getAll().then(setDepartments).catch(console.error);
+    collegeApi.getAll().then(setColleges).catch(console.error);
   }, []);
 
   const toggle = (day: string) =>
@@ -53,12 +58,17 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
         // Calculate unavailable days to send directly to backend
         const unavailableDays = DAYS.filter((d) => !availableDays.includes(d));
 
+        if (availableDays.length === 0) {
+          alert("A lecturer must be available at least one day.");
+          return;
+        }
+
         onSubmit({
           first_name: fd.get("first_name") as string,
           last_name: fd.get("last_name") as string,
           staff_id: fd.get("staff_id") as string,
           email: fd.get("email") as string,
-          department: Number(fd.get("department")),
+          college: Number(fd.get("college")),
           unavailable_days_input: unavailableDays,
         });
       }}
@@ -101,18 +111,19 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
 
       <div>
         <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase tracking-wider">
-          Department
+          College
         </label>
         <select
-          name="department"
-          defaultValue={initial?.department ?? ""}
+          name="college"
+          value={selectedCollege}
+          onChange={(e) => setSelectedCollege(e.target.value)}
           required
           className={selectCls}
         >
-          <option value="">Select department…</option>
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name} ({d.code})
+          <option value="">Select college…</option>
+          {colleges.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({c.code})
             </option>
           ))}
         </select>

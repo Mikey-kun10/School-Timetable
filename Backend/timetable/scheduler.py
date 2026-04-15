@@ -44,23 +44,38 @@ def generate_time_slots():
     return created
 
 
-def get_suitable_halls(total_student_count, department_ids):
-    """Find halls matching capacity and department constraints for a group."""
+def get_suitable_halls(total_student_count, department_ids, course_type='departmental'):
+    """Find halls matching capacity and department/college constraints for a group."""
+    from .models import Department
+    course_colleges = set(
+        Department.objects.filter(id__in=department_ids)
+        .values_list('college_id', flat=True)
+    ) if department_ids else set()
+
     suitable = []
-    for hall in LectureHall.objects.prefetch_related('departments').all():
-        # Capacity check
+    for hall in LectureHall.objects.prefetch_related('colleges').all():
+        # Must have at least enough capacity
         if hall.capacity < total_student_count:
             continue
-        if hall.capacity > total_student_count * CAPACITY_UPPER_MULTIPLIER:
+
+        # Upper bound: only enforce for non-general halls.
+        # For general/large courses skip the upper multiplier — any big-enough hall is fine.
+        if course_type != 'general' and hall.capacity > total_student_count * CAPACITY_UPPER_MULTIPLIER:
             continue
 
-        # Department compatibility
+        # College compatibility
         if hall.hall_type == 'general':
+            # A general hall is always compatible
             suitable.append(hall)
-        elif hall.hall_type in ('shared', 'department'):
-            hall_dept_ids = set(hall.departments.values_list('id', flat=True))
-            if department_ids & hall_dept_ids:
+        elif hall.hall_type in ('shared', 'college'):
+            # Only add if at least one of the course's colleges matches
+            if not course_colleges:
+                # Course has no department info — treat as compatible with all non-general halls
                 suitable.append(hall)
+            else:
+                hall_college_ids = set(hall.colleges.values_list('id', flat=True))
+                if course_colleges & hall_college_ids:
+                    suitable.append(hall)
 
     suitable.sort(key=lambda h: h.capacity)
     return suitable
@@ -119,7 +134,11 @@ def generate_timetable():
 
     groups = {}
     for course in all_courses:
-        gid = course.shared_session_id if course.shared_session_id else f"SINGLE_{course.id}"
+        # Strip whitespace and treat as None if empty
+        raw_sid = course.shared_session_id
+        clean_sid = raw_sid.strip() if raw_sid else None
+        
+        gid = clean_sid if clean_sid else f"SINGLE_{course.id}"
         if gid not in groups:
             groups[gid] = []
         groups[gid].append(course)
@@ -160,7 +179,9 @@ def generate_timetable():
         for c in courses:
             all_dept_ids.update(c.get_all_departments().values_list('id', flat=True))
 
-        suitable_halls = get_suitable_halls(total_students, all_dept_ids)
+        # Determine dominant course type (if any course is general, treat group as general)
+        group_course_type = 'general' if any(c.course_type == 'general' for c in courses) else courses[0].course_type
+        suitable_halls = get_suitable_halls(total_students, all_dept_ids, group_course_type)
 
         if not suitable_halls:
             unscheduled.append({

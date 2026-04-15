@@ -5,8 +5,8 @@ import DataTable from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Toast from "@/components/ui/Toast";
 import CourseForm from "@/components/CourseForm";
-import { courseApi, lecturerApi, departmentApi } from "@/lib/api";
-import { Course, Lecturer, Department } from "@/lib/types";
+import { courseApi, lecturerApi, departmentApi, ApiError } from "@/lib/api";
+import { Course } from "@/lib/types";
 
 interface CourseExtended extends Course {
   lecturerName: string;
@@ -40,7 +40,11 @@ export default function CoursesPage() {
         shared_session_id: c.shared_session_id || "—"
       }));
       setData(joined);
-    }).catch(console.error);
+    }).catch((err) => {
+      if (!(err instanceof ApiError) || err.status >= 500) {
+        console.error(err);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -63,8 +67,10 @@ export default function CoursesPage() {
         load();
       })
       .catch((err) => {
-        console.error(err);
-        setToast({ message: "An error occurred.", type: "error" });
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "An error occurred.", type: "error" });
       })
       .finally(() => setLoading(false));
   };
@@ -78,8 +84,10 @@ export default function CoursesPage() {
         load();
       })
       .catch((err) => {
-        console.error(err);
-        setToast({ message: "An error occurred.", type: "error" });
+        if (!(err instanceof ApiError) || err.status >= 500) {
+          console.error(err);
+        }
+        setToast({ message: err.message || "An error occurred.", type: "error" });
       });
   };
 
