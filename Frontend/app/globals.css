@@ -26,19 +26,51 @@
   }
 }
 
+#print-container {
+  display: none;
+}
+
 @media print {
-  .no-print {
+  /* Hide the entire app */
+  body > *:not(#print-container) {
     display: none !important;
   }
-  
+
+  /* Show print container and let it expand fully */
+  #print-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  #print-container * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
   @page {
-    size: landscape;
+    size: A3 landscape;
     margin: 1cm;
   }
 
   body {
     background: white !important;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
   }
 }

@@ -1,25 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Users, Building2, GraduationCap } from "lucide-react";
+import { BookOpen, Users, Building2, GraduationCap, School } from "lucide-react";
 import Link from "next/link";
-import { departmentApi, lecturerApi, hallApi, courseApi } from "@/lib/api";
+import { departmentApi, lecturerApi, hallApi, courseApi, collegeApi } from "@/lib/api";
 
 interface Stats {
   courses: number;
   lecturers: number;
   halls: number;
   departments: number;
+  colleges: number;
 }
 
 const CARDS = [
+  {
+    label: "College",
+    key: "colleges" as keyof Stats,
+    icon: School,
+    href: "/dashboard/colleges",
+    color: "text-white/50",
+    bg: "bg-black/30",
+  },
   {
     label: "Departments",
     key: "departments" as keyof Stats,
     icon: Building2,
     href: "/dashboard/departments",
-    color: "text-indigo-300",
-    bg: "bg-indigo-500/30",
+    color: "text-purple-300",
+    bg: "bg-purple-500/30",
   },
   {
     label: "Lecturers",
@@ -49,7 +58,7 @@ const CARDS = [
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats>({
-    courses: 0, lecturers: 0, halls: 0, departments: 0,
+    courses: 0, lecturers: 0, halls: 0, departments: 0, colleges: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -58,13 +67,15 @@ export default function DashboardPage() {
       courseApi.getAll(),
       lecturerApi.getAll(),
       hallApi.getAll(),
-      departmentApi.getAll()
-    ]).then(([courses, lecturers, halls, departments]) => {
+      departmentApi.getAll(),
+      collegeApi.getAll(),
+    ]).then(([courses, lecturers, halls, departments, colleges]) => {
       setStats({
         courses: courses.length,
         lecturers: lecturers.length,
         halls: halls.length,
         departments: departments.length,
+        colleges: colleges.length,
       });
       setLoading(false);
     }).catch(err => {
@@ -103,7 +114,7 @@ export default function DashboardPage() {
             </div>
             <div className="font-mono text-3xl font-medium text-white/80">
               {loading ? (
-                <div className="h-8 w-16 bg-slate-800 rounded animate-pulse" />
+                <div className="h-8 w-16 bg-b;ue-900 rounded animate-pulse" />
               ) : (
                 stats[key]
               )}

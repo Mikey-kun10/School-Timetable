@@ -12,40 +12,55 @@ export class ApiError extends Error {
 }
 
 async function fetcher<T>(url: string, options?: RequestInit): Promise<T> {
+  const isFormData = options?.body instanceof FormData;
+
   const res = await fetch(`${API_BASE}${url}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...options?.headers,
     },
   });
+
+  if (res.status === 204) return null as T;
+
+  const raw = await res.text();
+  let parsed: any = null;
+
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = raw;
+  }
+
   if (!res.ok) {
     let message = `API Error: ${res.status}`;
-    try {
-      const data = await res.json();
-      if (typeof data === "object" && data !== null) {
-        // Handle DRF validation error objects: { "field": ["error"] } or { "detail": "error" }
-        if (data.detail) {
-          message = data.detail;
-        } else {
-          message = Object.entries(data)
-            .map(([field, errors]) => {
-              const fieldName = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ");
-              const errs = Array.isArray(errors) ? errors.join(", ") : String(errors);
-              return `${fieldName}: ${errs}`;
-            })
-            .join(" | ");
-        }
+
+    if (typeof parsed === "object" && parsed !== null) {
+      if (parsed.detail) {
+        message = parsed.detail;
+      } else {
+        message = Object.entries(parsed)
+          .map(([field, errors]) => {
+            const fieldName =
+              field.charAt(0).toUpperCase() +
+              field.slice(1).replace(/_/g, " ");
+            const errs = Array.isArray(errors)
+              ? errors.join(", ")
+              : String(errors);
+            return `${fieldName}: ${errs}`;
+          })
+          .join(" | ");
       }
-    } catch {
-      // Fallback if not JSON
-      const text = await res.text();
-      message = text.length < 100 ? text : `Server error (${res.status})`;
+    } else if (typeof parsed === "string") {
+      message =
+        parsed.length < 100 ? parsed : `Server error (${res.status})`;
     }
+
     throw new ApiError(message, res.status);
   }
-  if (res.status === 204) return null as T;
-  return res.json() as Promise<T>;
+
+  return parsed as T;
 }
 
 // ── Colleges ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,100 @@
+name,capacity,hall_type,colleges
+
+LT1,1400,general,
+LT2,1500,general,
+LT3,1600,general,
+LT4,1350,general,
+LT5,1550,general,
+LT6,1450,general,
+LT7,1500,general,
+LT8,1650,general,
+LT9,1550,general,
+LT10,1500,general,
+
+Hall A,300,college,COAES
+Hall B,600,shared,"COAES,COCCS"
+Hall C,300,college,COAES
+Hall D,600,shared,"COAES,COEVS"
+Hall E,300,college,COAES
+Hall F,900,shared,"COAES,COCCS,COMSS"
+Hall G,300,college,COAES
+Hall H,600,shared,"COAES,COLBS"
+Hall I,300,college,COAES
+Hall J,900,shared,"COAES,COEVS,COCCS"
+
+Hall K,300,college,COCCS
+Hall L,600,shared,"COCCS,COAES"
+Hall M,300,college,COCCS
+Hall N,600,shared,"COCCS,COMSS"
+Hall O,300,college,COCCS
+Hall P,900,shared,"COCCS,COAES,COEVS"
+Hall Q,300,college,COCCS
+Hall R,600,shared,"COCCS,COLBS"
+Hall S,300,college,COCCS
+Hall T,900,shared,"COCCS,COLAW,COAES"
+
+Hall U,300,college,COEVS
+Hall V,600,shared,"COEVS,COAES"
+Hall W,300,college,COEVS
+Hall X,600,shared,"COEVS,COCCS"
+Hall Y,300,college,COEVS
+Hall Z,900,shared,"COEVS,COAES,COMSS"
+Hall AA,300,college,COEVS
+Hall AB,600,shared,"COEVS,COLBS"
+Hall AC,300,college,COEVS
+Hall AD,900,shared,"COEVS,COLAW,COCCS"
+
+Hall AE,300,college,COHES
+Hall AF,600,shared,"COHES,COAES"
+Hall AG,300,college,COHES
+Hall AH,600,shared,"COHES,COCCS"
+Hall AI,300,college,COHES
+Hall AJ,900,shared,"COHES,COEVS,COMSS"
+Hall AK,300,college,COHES
+Hall AL,600,shared,"COHES,COLBS"
+Hall AM,300,college,COHES
+Hall AN,900,shared,"COHES,COLAW,COAES"
+
+Hall AO,300,college,COLAW
+Hall AP,600,shared,"COLAW,COAES"
+Hall AQ,300,college,COLAW
+Hall AR,600,shared,"COLAW,COCCS"
+Hall AS,300,college,COLAW
+Hall AT,900,shared,"COLAW,COEVS,COMSS"
+Hall AU,300,college,COLAW
+Hall AV,600,shared,"COLAW,COLBS"
+Hall AW,300,college,COLAW
+Hall AX,900,shared,"COLAW,COAES,COCCS"
+
+Hall AY,300,college,COLBS
+Hall AZ,600,shared,"COLBS,COAES"
+Hall BA,300,college,COLBS
+Hall BB,600,shared,"COLBS,COCCS"
+Hall BC,300,college,COLBS
+Hall BD,900,shared,"COLBS,COEVS,COMSS"
+Hall BE,300,college,COLBS
+Hall BF,600,shared,"COLBS,COLAW"
+Hall BG,300,college,COLBS
+Hall BH,900,shared,"COLBS,COAES,COCCS"
+
+Hall BI,300,college,COMSS
+Hall BJ,600,shared,"COMSS,COAES"
+Hall BK,300,college,COMSS
+Hall BL,600,shared,"COMSS,COCCS"
+Hall BM,300,college,COMSS
+Hall BN,900,shared,"COMSS,COEVS,COLBS"
+Hall BO,300,college,COMSS
+Hall BP,600,shared,"COMSS,COLAW"
+Hall BQ,300,college,COMSS
+Hall BR,900,shared,"COMSS,COAES,COCCS"
+
+Hall BS,900,college,COPGS
+Hall BT,1200,shared,"COPGS,COAES,COCCS,COMSS"
+Hall BU,900,college,COPGS
+Hall BV,1200,shared,"COPGS,COEVS,COLBS,COLAW"
+Hall BW,900,college,COPGS
+Hall BX,1200,shared,"COPGS,COAES,COCCS,COEVS"
+Hall BY,900,college,COPGS
+Hall BZ,1200,shared,"COPGS,COMSS,COLBS,COLAW"
+Hall CA,900,college,COPGS
+Hall CB,1200,shared,"COPGS,COAES,COCCS,COLAW"

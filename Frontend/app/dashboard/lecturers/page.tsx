@@ -5,8 +5,9 @@ import DataTable from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Toast from "@/components/ui/Toast";
 import LecturerForm from "@/components/LecturerForm";
-import { lecturerApi, ApiError } from "@/lib/api";
-import { Lecturer, DAYS } from "@/lib/types";
+import { lecturerApi, collegeApi, ApiError } from "@/lib/api";
+import CSVUploadModal from "@/components/ui/CSVUploadModal";
+import { Lecturer, College, DAYS } from "@/lib/types";
 
 const DAY_SHORT: Record<string, string> = {
   Monday: "Mon",
@@ -31,6 +32,8 @@ function getDayColor(day: string): string {
 export default function LecturersPage() {
   const [data, setData] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(false);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [csvOpen, setCsvOpen] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; row?: Lecturer }>({
     open: false,
   });
@@ -40,7 +43,10 @@ export default function LecturersPage() {
   } | null>(null);
 
   const load = useCallback(() => {
-    lecturerApi.getAll().then(setData).catch((err) => {
+    Promise.all([lecturerApi.getAll(), collegeApi.getAll()]).then(([lecturer, cols]) => {
+      setData(lecturer);
+      setColleges(cols);
+    }).catch((err) => {
       if (!(err instanceof ApiError) || err.status >= 500) {
         console.error(err);
       }
@@ -109,7 +115,7 @@ export default function LecturersPage() {
             filterable: true,
             filterValue: (r) => `${r.first_name} ${r.last_name}`,
             render: (r) => (
-              <span className="font-medium text-black/60">
+              <span className="font-medium text-blue-400">
                 {r.first_name} {r.last_name}
               </span>
             ),
@@ -137,10 +143,23 @@ export default function LecturersPage() {
               );
             },
           },
+          {
+            key: "colleges",
+            label: "Colleges",
+            filterable: true,
+            filterOptions: colleges.map((c) => c.code),
+            filterValue: (r) => {
+              return colleges.find((col) => col.id === r.college)?.code ?? "";
+            },
+            render: (r) => {
+              return colleges.find((col) => col.id === r.college)?.code ?? "";
+            },
+          },
         ]}
         onAdd={() => setModal({ open: true })}
         onEdit={(row) => setModal({ open: true, row })}
         onDelete={(id) => handleDelete(Number(id))}
+        onImport={() => setCsvOpen(true)}
       />
 
       <Modal
@@ -154,6 +173,64 @@ export default function LecturersPage() {
           loading={loading}
         />
       </Modal>
+
+      <CSVUploadModal
+        open={csvOpen}
+        onClose={() => setCsvOpen(false)}
+        onDone={() => { setCsvOpen(false); load(); }}
+        entityName="Lecturer"
+        uniqueKey="staff_id"
+        existingData={data}
+        columns={[
+          { csvHeader: "first_name", key: "first_name", label: "First Name", required: true },
+          { csvHeader: "last_name", key: "last_name", label: "Last Name", required: true },
+          { csvHeader: "staff_id", key: "staff_id", label: "Staff ID", required: true },
+          { csvHeader: "email", key: "email", label: "Email" },
+          { csvHeader: "college_code", key: "college", label: "College Code", required: true, transform: (v) => String(v).toUpperCase() },
+          {
+            csvHeader: "unavailable_days",
+            key: "unavailable_days_input",
+            label: "Unavailable Days",
+            transform: (v) => v ? v.split(";").map((d) => d.trim()) : [],
+          },
+        ]}
+        sampleRows={[
+          ["John", "Smith", "STF001", "j.smith@uni.edu", "CS", "Wednesday"],
+          ["Alice", "Jones", "STF002", "a.jones@uni.edu", "EE", ""],
+          ["Bob", "Brown", "STF003", "", "MTH", "Monday;Friday"],
+        ]}
+        onUpload={async (rows) => {
+          let saved = 0;
+          const errors: string[] = [];
+          for (const row of rows) {
+            try {
+              const normalize = (val: any) =>
+                String(val).trim().toUpperCase();
+
+              const col = colleges.find(
+                (c) => normalize(c.code) === normalize(row.college)
+              );
+
+              if (!col) {
+                errors.push(`Unknown College code: ${row.college}`);
+                continue;
+              }
+              await lecturerApi.add({
+                first_name: String(row.first_name),
+                last_name: String(row.last_name),
+                staff_id: String(row.staff_id),
+                email: String(row.email ?? ""),
+                college: col.id,
+                unavailable_days_input: (row.unavailable_days_input as string[]) ?? [],
+              } as unknown as Lecturer);
+              saved++;
+            } catch (e) {
+              errors.push(`${row.staff_id}: ${(e as Error).message}`);
+            }
+          }
+          return { saved, skipped: 0, errors };
+        }}
+      />
 
       {toast && (
         <Toast

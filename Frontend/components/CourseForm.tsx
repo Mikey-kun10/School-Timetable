@@ -84,7 +84,7 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
 
         onSubmit({
           name: fd.get("name") as string,
-          code: (fd.get("code") as string).toUpperCase(),
+          code: (fd.get("code") as string !== "—" ? (fd.get("code") as string).toUpperCase() : ""),
           department: courseType === "general" ? null : selectedDept,
           level: Number(fd.get("level")),
           course_type: courseType,
@@ -93,7 +93,7 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
           hours: Number(fd.get("hours")),
           student_count: Number(fd.get("student_count")),
           lecturer: selectedLecturer!,
-          shared_session_id: (fd.get("shared_session_id") as string || "").trim() || null,
+          shared_session_id: (fd.get("shared_session_id") as string !== "—" ? fd.get("shared_session_id") as string : "").trim() || null,
         });
       }}
       className="space-y-4"
@@ -107,7 +107,7 @@ export default function CourseForm({ initial, onSubmit, loading }: Props) {
           required
         />
         <Field
-          label="Shared Session ID (Optional)"
+          label="Shared Group ID (Optional)"
           name="shared_session_id"
           defaultValue={initial?.shared_session_id || ""}
           placeholder="e.g. GROUP_A"

@@ -140,10 +140,10 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
               type="button"
               onClick={() => toggle(day)}
               className={`
-                px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
+                px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:ring-4 hover:ring-blue-400/30
                 ${
                   availableDays.includes(day)
-                    ? "bg-blue-600 border-blue-500 text-white"
+                    ? "bg-blue-600 border-blue-500 text-white hover:bg-blue-400 hover:border-blue-300"
                     : "bg-blue-400 border-blue-300 text-white hover:bg-blue-600 hover:border-blue-500"
                 }
               `}

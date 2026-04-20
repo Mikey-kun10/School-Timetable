@@ -1,0 +1,37 @@
+name,code,college_code
+Computer Science,CSC,COCCS
+Cyber Security,CYS,COCCS
+Information Technology,IFT,COCCS
+Software Engineering,SWE,COCCS
+
+Electrical and Electronics Engineering,EEE,COAES
+Mechanical Engineering,MEE,COAES
+Civil Engineering,CVE,COAES
+Agricultural Engineering,AGE,COAES
+
+Architecture,ARC,COEVS
+Estate Management,EST,COEVS
+Urban and Regional Planning,URP,COEVS
+Quantity Surveying,QSV,COEVS
+
+Medicine and Surgery,MED,COHES
+Nursing Science,NSC,COHES
+Physiology,PHY,COHES
+Anatomy,ANA,COHES
+
+Law,LAW,COLAW
+Private and Property Law,PPL,COLAW
+Public and International Law,PIL,COLAW
+
+English,ENG,COLBS
+History and International Studies,HIS,COLBS
+Religious Studies,RLS,COLBS
+Philosophy,PHL,COLBS
+
+Accounting,ACC,COMSS
+Business Administration,BUS,COMSS
+Economics,ECO,COMSS
+Mass Communication,MAC,COMSS
+Political Science,POL,COMSS
+
+Postgraduate Studies,PGS,COPGS

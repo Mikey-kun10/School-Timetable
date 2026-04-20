@@ -9,8 +9,24 @@ export const DAYS: Day[] = [
 export const LEVELS = [100, 200, 300, 400, 500];
 
 export const TIME_SLOTS = [
-  "8:00 - 9:00", "9:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "01:00 - 02:00", "02:00 - 03:00", "03:00 - 04:00", "04:00 - 05:00", "05:00 - 06:00",
+  "8:00 - 9:00", "9:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00", "12:00 - 1:00", "01:00 - 02:00", "02:00 - 03:00", "03:00 - 04:00", "04:00 - 05:00", "05:00 - 06:00",
 ];
+
+export function createParamCounter() {
+  let lastParam: number | null = null;
+  let count = 0;
+
+  return function (param: number): number {
+    if (param === lastParam) {
+      count += 1;
+    } else {
+      lastParam = param;
+      count = 1;
+    }
+
+    return count;
+  };
+}
 
 export interface College {
   id?: number;
@@ -68,6 +84,9 @@ export interface TimetableEntry {
     day: string;
     start_hour: number;
     end_hour: number;
+    duration: number;
+    start_time_display: string;
+    end_time_display: string;
   };
 }
 

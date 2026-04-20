@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Pencil, Trash2, Plus, ChevronDown, X } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronDown, X, FileUp } from "lucide-react";
 
 interface Column<T> {
   key: keyof T | string;
@@ -19,11 +19,12 @@ interface Props<T extends { id?: number | string }> {
   onAdd: () => void;
   onEdit: (row: T) => void;
   onDelete: (id: NonNullable<T["id"]>) => void;
+  onImport?: () => void;
   loading?: boolean;
 }
 
 export default function DataTable<T extends { id?: number | string }>({
-  title, columns, data, onAdd, onEdit, onDelete, loading,
+  title, columns, data, onAdd, onEdit, onImport, onDelete, loading,
 }: Props<T>) {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -80,13 +81,6 @@ export default function DataTable<T extends { id?: number | string }>({
     });
   }, [data, search, filters, columns]);
 
-  // const filtered = data.filter((row) =>
-  //   Object.values(row as object)
-  //     .join(" ")
-  //     .toLowerCase()
-  //     .includes(search.toLowerCase())
-  // );
-
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -120,7 +114,7 @@ export default function DataTable<T extends { id?: number | string }>({
             <button
               onClick={() => setFilterPanelOpen((v) => !v)}
               className={`
-                flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors
+                flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors shadow-md shadow-blue-600/20
                 ${filterPanelOpen || activeFilterCount > 0
                   ? "bg-blue-400 border-blue-300 text-white/70"
                   : "bg-blue-500 border-blue-400 text-white hover:bg-blue-400 hover:border-blue-300"
@@ -145,12 +139,25 @@ export default function DataTable<T extends { id?: number | string }>({
             onClick={onAdd}
             className="
               flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
-              bg-blue-500 hover:bg-blue-400 text-white transition-colors
+              bg-blue-500 shadow-md shadow-blue-600/20 hover:bg-blue-400 text-white transition-colors
             "
           >
             <Plus size={14} />
             Add
           </button>
+          {onImport && (
+            <button
+              onClick={onImport}
+              className="
+                        flex items-center gap-2 px-4 py-2 rounded-lg text-sm
+                        font-medium bg-white border border-blue-400 hover:ring-4 hover:ring-blue-400/70 hover:bg-blue-500 hover:text-white
+                        text-blue-400 transition-all active:scale-95 no-print
+                      "
+            >
+              <FileUp size={14} />
+              Upload
+            </button>
+          )}
         </div>
       </div>
 
@@ -276,12 +283,12 @@ export default function DataTable<T extends { id?: number | string }>({
                 {columns.map((col) => (
                   <th
                     key={String(col.key)}
-                    className="px-4 py-3 text-left font-mono text-xs text-white uppercase tracking-wider whitespace-nowrap"
+                    className="px-4 py-3 text-left font-mono text-xs text-white/80 uppercase tracking-wider whitespace-nowrap"
                   >
                     {col.label}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-right font-mono text-xs text-white uppercase tracking-wider">
+                <th className="px-4 py-3 text-right font-mono text-xs text-white/80 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -316,7 +323,7 @@ export default function DataTable<T extends { id?: number | string }>({
                     className="border-b border-blue-800 hover:bg-blue-200/20 transition-colors"
                   >
                     {columns.map((col) => (
-                      <td key={String(col.key)} className="px-4 py-3 text-black/30">
+                      <td key={String(col.key)} className="px-4 py-3 text-black/40">
                         {col.render
                           ? col.render(row)
                           : String((row as Record<string, unknown>)[col.key as string] ?? "—")}
@@ -326,13 +333,13 @@ export default function DataTable<T extends { id?: number | string }>({
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => onEdit(row)}
-                          className="p-1.5 rounded-md text-black/30 hover:text-blue-500 hover:bg-blue-400/30 transition-colors"
+                          className="p-1.5 rounded-md text-black/40 hover:text-blue-500 hover:bg-blue-400/30 transition-colors"
                         >
                           <Pencil size={13} />
                         </button>
                         <button
                           onClick={() => onDelete(row.id as NonNullable<T["id"]>)}
-                          className="p-1.5 rounded-md text-black/30 hover:text-blue-500 hover:bg-blue-400/30 transition-colors"
+                          className="p-1.5 rounded-md text-black/40 hover:text-blue-500 hover:bg-blue-400/30 transition-colors"
                         >
                           <Trash2 size={13} />
                         </button>

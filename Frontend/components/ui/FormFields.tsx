@@ -21,7 +21,7 @@ export function Field({
       <input
         name={name}
         type={type}
-        defaultValue={defaultValue}
+        defaultValue={defaultValue !== "—" ? defaultValue : ""}
         placeholder={placeholder}
         required={required}
         className="
