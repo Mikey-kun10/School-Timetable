@@ -48,8 +48,8 @@ export interface Lecturer {
   staff_id: string;
   college: number | College;
   email: string;
-  unavailable_days?: { id: number, day: string }[];
-  unavailable_days_input?: string[]; // For API submission
+  unavailable_days?: { id: number, day: string, start_hour: number, end_hour: number }[];
+  unavailable_days_input?: { day: string, start_hour: number, end_hour: number }[]; // For API submission
 }
 
 export interface Hall {
@@ -92,5 +92,5 @@ export interface TimetableEntry {
 
 export interface GenerateResult {
   message?: string;
-  unscheduled?: { course: string; reason: string }[];
+  unscheduled?: { course: string; reason: string; dept_code: string; level: number }[];
 }

@@ -5,6 +5,14 @@ import { DAYS, College } from "@/lib/types";
 import { Field, SubmitBtn } from "@/components/ui/FormFields";
 import { collegeApi } from "@/lib/api";
 
+import VisualGrid from "@/components/unavailability/VisualGrid";
+
+interface UnavailabilityBlock {
+  day: string;
+  start_hour: number;
+  end_hour: number;
+}
+
 interface LecturerData {
   id?: number;
   first_name: string;
@@ -12,8 +20,8 @@ interface LecturerData {
   staff_id: string;
   college: number | College;
   email: string;
-  unavailable_days_input?: string[];
-  unavailable_days?: { id: number, day: string }[];
+  unavailable_days_input?: UnavailabilityBlock[];
+  unavailable_days?: { id: number, day: string, start_hour: number, end_hour: number }[];
 }
 
 interface Props {
@@ -30,11 +38,15 @@ const selectCls = `
 
 export default function LecturerForm({ initial, onSubmit, loading }: Props) {
   const [colleges, setColleges] = useState<College[]>([]);
-  // We manage the UI state as available days for user friendliness
-  const currentUnavailable = initial?.unavailable_days?.map(d => d.day) || [];
-  const [availableDays, setAvailableDays] = useState<string[]>(
-    initial ? DAYS.filter(d => !currentUnavailable.includes(d)) : DAYS
+  
+  const [unavailableBlocks, setUnavailableBlocks] = useState<UnavailabilityBlock[]>(
+    initial?.unavailable_days?.map(d => ({
+        day: d.day,
+        start_hour: d.start_hour,
+        end_hour: d.end_hour
+    })) || []
   );
+
   const [selectedCollege, setSelectedCollege] = useState<string>(
     initial?.college && typeof initial.college === "object"
       ? String(initial.college.id)
@@ -45,21 +57,19 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
     collegeApi.getAll().then(setColleges).catch(console.error);
   }, []);
 
-  const toggle = (day: string) =>
-    setAvailableDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
-    );
-
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
-        // Calculate unavailable days to send directly to backend
-        const unavailableDays = DAYS.filter((d) => !availableDays.includes(d));
-
-        if (availableDays.length === 0) {
-          alert("A lecturer must be available at least one day.");
+        
+        // Validation: Must have at least one slot available
+        // Total slots = 5 days * 10 hours = 50
+        // We calculate hours unavailable
+        const totalHoursUnavailable = unavailableBlocks.reduce((acc, b) => acc + (b.end_hour - b.start_hour), 0);
+        
+        if (totalHoursUnavailable >= 50) {
+          alert("A lecturer must be available for at least one hour.");
           return;
         }
 
@@ -69,7 +79,7 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
           staff_id: fd.get("staff_id") as string,
           email: fd.get("email") as string,
           college: Number(fd.get("college")),
-          unavailable_days_input: unavailableDays,
+          unavailable_days_input: unavailableBlocks,
         });
       }}
       className="space-y-4"
@@ -131,27 +141,9 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
 
       <div>
         <label className="block text-xs font-mono text-slate-400 mb-2 uppercase tracking-wider">
-          Available Days
+          Unavailability Schedule
         </label>
-        <div className="flex flex-wrap gap-2">
-          {DAYS.map((day) => (
-            <button
-              key={day}
-              type="button"
-              onClick={() => toggle(day)}
-              className={`
-                px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:ring-4 hover:ring-blue-400/30
-                ${
-                  availableDays.includes(day)
-                    ? "bg-blue-600 border-blue-500 text-white hover:bg-blue-400 hover:border-blue-300"
-                    : "bg-blue-400 border-blue-300 text-white hover:bg-blue-600 hover:border-blue-500"
-                }
-              `}
-            >
-              {day.slice(0, 3)}
-            </button>
-          ))}
-        </div>
+        <VisualGrid value={unavailableBlocks} onChange={setUnavailableBlocks} />
       </div>
 
       <SubmitBtn loading={loading} />

@@ -23,11 +23,14 @@ const GRID_SLOTS = [
 interface UnscheduledItem {
   course: string;
   reason: string;
+  dept_code: string;
+  level: number;
 }
 
 interface Stats {
   courses: number;
   halls: number;
+  totalSessions: number;
 }
 
 // ── level colours ─────────────────────────────────────────────────────────────
@@ -55,8 +58,8 @@ const selectCls = `
 
 // ── timetable cell ────────────────────────────────────────────────────────────
 
-function TimetableCell({ key, entries }: { key: string, entries: TimetableEntry[] }) {
-  if (entries.length === 0) return
+function TimetableCell({ entries }: { entries: TimetableEntry[] }) {
+  if (entries.length === 0) return null;
   console.log(entries);
 
   const maxDuration = Math.max(
@@ -142,18 +145,17 @@ interface PrintLayoutProps {
   selectedLevel: string;
 }
 function PrintPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const el = useRef<HTMLDivElement | null>(null);
 
-  if (!el.current && typeof document !== "undefined") {
-    el.current = document.createElement("div");
-    el.current.id = "print-container";
-    // ← Remove the inline style entirely — CSS handles visibility
-  }
-
   useEffect(() => {
-    const container = el.current;
-    if (!container) return;
+    const container = document.createElement("div");
+    container.id = "print-container";
     document.body.appendChild(container);
+    el.current = container;
+    
+    setMounted(true);
+    
     return () => {
       if (document.body.contains(container)) {
         document.body.removeChild(container);
@@ -161,7 +163,7 @@ function PrintPortal({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  if (!el.current) return null;
+  if (!mounted || !el.current) return null;
   return createPortal(children, el.current);
 }
 
@@ -391,9 +393,10 @@ export default function TimetablePage() {
   const [unscheduled, setUnscheduled] = useState<UnscheduledItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasData, setHasData] = useState(false);
+  const [totalScheduled, setTotalScheduled] = useState(0);
 
   const [stats, setStats] = useState<Stats>({
-    courses: 0, halls: 0,
+    courses: 0, halls: 0, totalSessions: 0
   });
 
   useEffect(() => {
@@ -401,9 +404,20 @@ export default function TimetablePage() {
       courseApi.getAll(),
       hallApi.getAll(),
     ]).then(([courses, halls]) => {
+      let expected = 0;
+      courses.forEach(c => {
+        if (c.lecturer) {
+          let rem = c.hours || 2;
+          while (rem > 0) {
+            expected++;
+            rem -= (rem >= 2 ? 2 : 1);
+          }
+        }
+      });
       setStats({
         courses: courses.length,
         halls: halls.length,
+        totalSessions: expected
       });
     }).catch(err => {
       console.error(err);
@@ -419,6 +433,7 @@ export default function TimetablePage() {
     setLoading(true);
     timetableApi.view()
       .then(data => {
+        setTotalScheduled(data.length);
         // Apply frontend filters
         let filtered = data;
         if (selectedDept) {
@@ -589,60 +604,85 @@ export default function TimetablePage() {
       )}
 
       {/* Stats strip */}
-      {hasData && !loading && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 no-print">
-          {[
-            {
-              label: "Scheduled",
-              value: `${entries.length}`,
-              color: "text-emerald-400",
-            },
-            {
-              label: "Unscheduled",
-              value: `${unscheduled.length}`,
-              color: "text-rose-400",
-            },
-            {
-              label: "Days used",
-              value: `${[...new Set(entries.map((e) => e.time_slot.day))].length}`,
-              color: "text-indigo-400",
-            },
-            {
-              label: "Halls used",
-              value: `${[...new Set(entries.map((e) => e.hall.name))].length}`,
-              color: "text-amber-400",
-            },
-          ].map(({ label, value, color }) => (
-            <div
-              key={label}
-              className="p-4 rounded-xl bg-blue-900 border border-blue-800"
-            >
-              <p className={`font-mono text-2xl font-medium ${color}`}>
-                {value}
-              </p>
-              <p className="text-xs text-white/60 mt-1">{label}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {hasData && !loading && (() => {
+        const filteredUnscheduled = unscheduled.filter(u => {
+          if (selectedDept && u.dept_code !== selectedDept) return false;
+          if (selectedLevel && u.level !== Number(selectedLevel)) return false;
+          return true;
+        });
 
-      {unscheduled.length > 0 && !loading && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 shadow-sm no-print">
-          <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-bold text-amber-700">
-              {unscheduled.length} session(s) unscheduled
-            </p>
-            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
-              {unscheduled.map((u, i) => (
-                <p key={i} className="text-[11px] text-amber-800/80 italic">
-                  • <span className="font-bold non-italic">{u.course}</span>: {u.reason}
-                </p>
+        const statsItems = [
+          {
+            label: "Scheduled",
+            value: `${[...new Set(entries.map((e) => e.course.code))].length}`,
+            color: "text-emerald-400",
+          },
+          {
+            label: "Unscheduled",
+            value: `${filteredUnscheduled.length}`,
+            color: "text-rose-400",
+          },
+          {
+            label: "Days used",
+            value: `${[...new Set(entries.map((e) => e.time_slot.day))].length}`,
+            color: "text-indigo-400",
+          },
+          {
+            label: "Halls used",
+            value: `${[...new Set(entries.map((e) => e.hall.name))].length}`,
+            color: "text-amber-400",
+          },
+        ];
+
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 no-print">
+              {statsItems.map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  className="p-4 rounded-xl bg-blue-900 border border-blue-800"
+                >
+                  <p className={`font-mono text-2xl font-medium ${color}`}>
+                    {value}
+                  </p>
+                  <p className="text-xs text-white/60 mt-1">{label}</p>
+                </div>
               ))}
             </div>
+
+            {filteredUnscheduled.length > 0 && (
+              <div className="flex items-start gap-4 p-5 rounded-2xl bg-rose-500/10 border border-rose-500/20 shadow-sm no-print">
+                <div className="p-2 rounded-full bg-rose-500/20">
+                  <AlertTriangle size={20} className="text-rose-500 shrink-0" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-rose-700">
+                    {filteredUnscheduled.length} sessions could not be scheduled
+                  </h3>
+                  <p className="text-xs text-rose-600/70 mt-0.5">
+                    These sessions violated strict constraints. Try reducing lecturer unavailabilities.
+                  </p>
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredUnscheduled.map((u, i) => (
+                      <div key={i} className="flex flex-col p-3 rounded-xl bg-white/50 border border-rose-500/10">
+                        <div className="flex items-center justify-between mb-1">
+                           <span className="text-xs font-bold text-rose-600">{u.course}</span>
+                           <span className="px-1.5 py-0.5 rounded bg-rose-100 text-[10px] text-rose-500 font-mono">
+                             {u.dept_code} | {u.level}L
+                           </span>
+                        </div>
+                        <p className="text-[11px] text-rose-800/80 italic line-clamp-2">
+                          {u.reason}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Legend */}
       {hasData && !loading && (

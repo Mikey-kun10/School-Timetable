@@ -106,13 +106,22 @@ class LecturerUnavailability(models.Model):
         Lecturer, on_delete=models.CASCADE, related_name='unavailable_days'
     )
     day = models.CharField(max_length=10, choices=DAYS_OF_WEEK)
+    start_hour = models.PositiveIntegerField(
+        validators=[MinValueValidator(8), MaxValueValidator(18)],
+        default=8,
+        help_text="Start of unavailability (e.g., 8 for 8 AM)"
+    )
+    end_hour = models.PositiveIntegerField(
+        validators=[MinValueValidator(8), MaxValueValidator(18)],
+        default=18,
+        help_text="End of unavailability (e.g., 18 for 6 PM)"
+    )
 
     class Meta:
-        unique_together = ('lecturer', 'day')
         verbose_name_plural = "Lecturer Unavailabilities"
 
     def __str__(self):
-        return f"{self.lecturer} - Unavailable on {self.day}"
+        return f"{self.lecturer} - Unavailable on {self.day} from {self.start_hour}:00 to {self.end_hour}:00"
 
 
 class Course(models.Model):

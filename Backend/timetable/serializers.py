@@ -69,12 +69,11 @@ class LectureHallSerializer(serializers.ModelSerializer):
 class LecturerUnavailabilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = LecturerUnavailability
-        fields = ['id', 'day']
+        fields = ['id', 'day', 'start_hour', 'end_hour']
 
 class LecturerSerializer(serializers.ModelSerializer):
     unavailable_days = LecturerUnavailabilitySerializer(many=True, read_only=True)
-    unavailable_days_input = serializers.ListField(
-        child=serializers.CharField(),
+    unavailable_days_input = serializers.JSONField(
         write_only=True,
         required=False
     )
@@ -92,8 +91,14 @@ class LecturerSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         days_data = validated_data.pop('unavailable_days_input', [])
         lecturer = Lecturer.objects.create(**validated_data)
-        for day in days_data:
-            LecturerUnavailability.objects.create(lecturer=lecturer, day=day)
+        for d in days_data:
+            # d is expected to be {'day': '...', 'start_hour': ..., 'end_hour': ...}
+            LecturerUnavailability.objects.create(
+                lecturer=lecturer, 
+                day=d.get('day'), 
+                start_hour=d.get('start_hour', 8), 
+                end_hour=d.get('end_hour', 18)
+            )
         return lecturer
         
     def update(self, instance, validated_data):
@@ -104,8 +109,13 @@ class LecturerSerializer(serializers.ModelSerializer):
         
         if days_data is not None:
             LecturerUnavailability.objects.filter(lecturer=instance).delete()
-            for day in days_data:
-                LecturerUnavailability.objects.create(lecturer=instance, day=day)
+            for d in days_data:
+                LecturerUnavailability.objects.create(
+                    lecturer=instance, 
+                    day=d.get('day'), 
+                    start_hour=d.get('start_hour', 8), 
+                    end_hour=d.get('end_hour', 18)
+                )
                 
         return instance
 
