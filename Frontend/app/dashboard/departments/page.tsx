@@ -150,6 +150,29 @@ export default function DepartmentsPage() {
             transform: (v) => String(v).toUpperCase()
           },
         ]}
+        validateRow={(row) => {
+          const college = String(row.college ?? "").trim();
+
+          if (!college) {
+            return `College is required.`;
+          }
+
+          // If no colleges exist yet in the DB, reject all rows with a clear message
+          if (colleges.length === 0) {
+            return `No colleges exist in the system yet. Add at least one department with a college first.`;
+          }
+
+          // Check if the college matches any existing college value (case-insensitive)
+          const match = colleges.some(
+            (c) => c.code.toLowerCase() === college.toLowerCase()
+          );
+
+          if (!match) {
+            return `College "${college}" does not match any existing college. Valid colleges: ${colleges.join(", ")}`;
+          }
+
+          return null;
+        }}
         sampleRows={[
           ["Computer Science", "CS", "COE"],
           ["Electrical Engineering", "EE", "COE"],

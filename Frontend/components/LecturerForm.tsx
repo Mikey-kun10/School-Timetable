@@ -72,6 +72,8 @@ export default function LecturerForm({ initial, onSubmit, loading }: Props) {
           alert("A lecturer must be available for at least one hour.");
           return;
         }
+        console.log(unavailableBlocks);
+        
 
         onSubmit({
           first_name: fd.get("first_name") as string,

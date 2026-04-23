@@ -217,6 +217,7 @@ export default function CoursesPage() {
             csvHeader: "lecturer_staff_id",
             key: "lecturer",
             label: "Lecturer Staff ID",
+            required: true,
           },
           {
             csvHeader: "department_code",
@@ -238,11 +239,13 @@ export default function CoursesPage() {
         ]}
         // Custom row-level validator for conditional required fields
         validateRow={(row) => {
+          const normalize = (v: any) => String(v).trim().toUpperCase();
           const type = String(row.course_type ?? "").toLowerCase();
           const deptCode = String(row.department ?? "").trim();
+          const deptCodeNorm = normalize(row.department ?? "");
 
           const sharedCodes = (row.shared_departments as unknown as string[]) ?? [];
-          
+
           if (!["departmental", "shared", "general"].includes(type)) {
             return `Invalid course_type "${row.course_type}". Must be departmental, shared, or general.`;
           }
@@ -254,6 +257,16 @@ export default function CoursesPage() {
           }
           if (type === "shared" && sharedCodes.length === 0) {
             return `course_type is "shared" but shared_department_codes is empty. Use semicolons to separate codes e.g. EE;MTH`;
+          }
+          
+          if (type === "shared") {
+            const overlap = sharedCodes.find(
+              (code) => normalize(code) === deptCodeNorm
+            );
+
+            if (overlap) {
+              return `Primary department "${deptCodeNorm}" should not be included in shared_department_codes`;
+            }
           }
 
           const level = Number(row.level);
@@ -268,6 +281,28 @@ export default function CoursesPage() {
           }
           if (Number(row.student_count) < 1) {
             return `Invalid student_count "${row.student_count}". Must be at least 1.`;
+          }
+
+          // ✅ Validate that departments actually exist
+          // Check primary department (if provided)
+          if (deptCodeNorm) {
+            const exists = departments.some(
+              (d) => normalize(d.code) === deptCodeNorm
+            );
+
+            if (!exists) {
+              return `Invalid department_code "${deptCodeNorm}"`;
+            }
+          }
+
+          // Check shared departments
+          const invalidShared = sharedCodes.find(
+            (code) =>
+              !departments.some((d) => normalize(d.code) === normalize(code))
+          );
+
+          if (invalidShared) {
+            return `Invalid shared_department_code "${invalidShared}"`;
           }
 
           return null; // null = valid

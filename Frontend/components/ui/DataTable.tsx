@@ -139,7 +139,7 @@ export default function DataTable<T extends { id?: number | string }>({
             onClick={onAdd}
             className="
               flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
-              bg-blue-500 shadow-md shadow-blue-600/20 hover:bg-blue-400 text-white transition-colors
+              bg-blue-500 shadow-md shadow-blue-600/20 hover:bg-blue-400 active:scale-95 text-white transition-colors
             "
           >
             <Plus size={14} />

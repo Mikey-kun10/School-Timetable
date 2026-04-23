@@ -188,6 +188,52 @@ export default function HallsPage() {
           }
         ]}
 
+        validateRow={(row) => {
+          const hallType = String(row.hall_type || "general").toLowerCase();
+
+          const collegesArr: string[] = (row.colleges ?? [])
+            .map((c: any) => String(c).trim().toUpperCase())
+            .filter(Boolean);
+
+          if (!["general", "college", "shared"].includes(hallType)) {
+            return `Invalid hall type "${hallType}"`;
+          }
+
+          // ✅ GENERAL: must have NO colleges
+          if (hallType === "general") {
+            if (collegesArr.length > 0) {
+              return `General hall must not have any colleges`;
+            }
+          }
+
+          // ✅ COLLEGE: must have EXACTLY ONE
+          if (hallType === "college") {
+            if (collegesArr.length !== 1) {
+              return `College hall must have exactly one college`;
+            }
+          }
+
+          // ✅ SHARED: must have MULTIPLE
+          if (hallType === "shared") {
+            if (collegesArr.length < 2) {
+              return `Shared hall must have at least two colleges`;
+            }
+          }
+
+          // ✅ Validate that colleges actually exist
+          const normalize = (v: any) => String(v).trim().toUpperCase();
+
+          const invalid = collegesArr.find(
+            (code) => !colleges.some((c) => normalize(c.code) === code)
+          );
+
+          if (invalid) {
+            return `Invalid college code "${invalid}"`;
+          }
+
+          return null;
+        }}
+
         sampleRows={[
           ["LT1", "200", "general", ""],
           ["Hall A", "80", "college", "COE"],

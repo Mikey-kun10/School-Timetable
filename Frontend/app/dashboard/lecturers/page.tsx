@@ -7,7 +7,7 @@ import Toast from "@/components/ui/Toast";
 import LecturerForm from "@/components/LecturerForm";
 import { lecturerApi, collegeApi, ApiError } from "@/lib/api";
 import CSVUploadModal from "@/components/ui/CSVUploadModal";
-import { Lecturer, College, DAYS } from "@/lib/types";
+import { Lecturer, College, DAYS, UnavailabilityBlock } from "@/lib/types";
 
 const DAY_SHORT: Record<string, string> = {
   Monday: "Mon",
@@ -41,6 +41,52 @@ export default function LecturersPage() {
     message: string;
     type: "success" | "error";
   } | null>(null);
+
+
+  const START_HOUR = 8;
+  const END_HOUR = 18; // exclusive
+  const getAvailableSlots = (blocks: any[]) => {
+    const grouped: Record<string, { start: number; end: number }[]> = {};
+
+    // group unavailable by day
+    blocks.forEach((b) => {
+      if (!grouped[b.day]) grouped[b.day] = [];
+      grouped[b.day].push({
+        start: b.start_hour,
+        end: b.end_hour,
+      });
+    });
+
+    const result: Record<string, string[]> = {};
+
+    DAYS.forEach((day) => {
+      const unavailable = grouped[day] || [];
+
+      let current = START_HOUR;
+      const slots: string[] = [];
+
+      // sort intervals
+      unavailable.sort((a, b) => a.start - b.start);
+
+      for (const u of unavailable) {
+        if (current < u.start) {
+          slots.push(`${current}-${u.start}`);
+        }
+        current = Math.max(current, u.end);
+      }
+
+      // remaining time after last block
+      if (current < END_HOUR) {
+        slots.push(`${current}-${END_HOUR}`);
+      }
+
+      if (slots.length > 0) {
+        result[day] = slots;
+      }
+    });
+
+    return result;
+  };
 
   const load = useCallback(() => {
     Promise.all([lecturerApi.getAll(), collegeApi.getAll()]).then(([lecturer, cols]) => {
@@ -125,19 +171,29 @@ export default function LecturersPage() {
             key: "unavailable_days",
             label: "Available Days",
             render: (r) => {
-              const unavailable = r.unavailable_days?.map((d: { day: string }) => d.day) || [];
-              const available = DAYS.filter((d) => !unavailable.includes(d));
+              const availableMap = getAvailableSlots(r.unavailable_days ?? []);
+
+              if (Object.keys(availableMap).length === 0) {
+                return "No Availability";
+              }
+
               return (
-                <div className="flex flex-wrap gap-1">
-                  {available.map((d) => (
-                    <span
-                      key={d}
-                      className={`px-2 py-0.5 rounded-md text-xs font-mono border ${getDayColor(
-                        d
-                      )}`}
-                    >
-                      {DAY_SHORT[d] ?? d}
-                    </span>
+                <div className="flex flex-col gap-1">
+                  {Object.entries(availableMap).map(([day, slots]) => (
+                    <div key={day} className="flex flex-wrap gap-1 items-center">
+                      <span className={`font-mono text-xs ${getDayColor(day)}`}>
+                        {DAY_SHORT[day] ?? day}:
+                      </span>
+
+                      {slots.map((slot, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-md text-xs font-mono border"
+                        >
+                          {slot}
+                        </span>
+                      ))}
+                    </div>
                   ))}
                 </div>
               );
@@ -185,20 +241,88 @@ export default function LecturersPage() {
           { csvHeader: "first_name", key: "first_name", label: "First Name", required: true },
           { csvHeader: "last_name", key: "last_name", label: "Last Name", required: true },
           { csvHeader: "staff_id", key: "staff_id", label: "Staff ID", required: true },
-          { csvHeader: "email", key: "email", label: "Email" },
+          { csvHeader: "email", key: "email", label: "Email", required: true },
           { csvHeader: "college_code", key: "college", label: "College Code", required: true, transform: (v) => String(v).toUpperCase() },
           {
             csvHeader: "unavailable_days",
             key: "unavailable_days_input",
             label: "Unavailable Days",
-            transform: (v) => v ? v.split(";").map((d) => d.trim()) : [],
+            transform: (v) => {
+              if (!v) return [];
+
+              return String(v)
+                .split(";") // split days
+                .flatMap((dayPart) => {
+                  const [day, times] = dayPart.split(":");
+
+                  if (!day || !times) return [];
+
+                  return times.split("|").map((range) => {
+                    const [start, end] = range.split("-").map(Number);
+
+                    return {
+                      day: day.trim(),
+                      start_hour: start,
+                      end_hour: end,
+                    };
+                  });
+                });
+            }
           },
         ]}
+        validateRow={(row) => {
+          const college = String(row.college ?? "").trim();
+
+          if (!college) {
+            return `College is required.`;
+          }
+
+          // If no colleges exist yet in the DB, reject all rows with a clear message
+          if (colleges.length === 0) {
+            return `No colleges exist in the system yet. Add at least one department with a college first.`;
+          }
+
+          // Check if the college matches any existing college value (case-insensitive)
+          const match = colleges.some(
+            (c) => c.code.toLowerCase() === college.toLowerCase()
+          );
+
+          if (!match) {
+            return `College "${college}" does not match any existing college. Valid colleges: ${colleges.join(", ")}`;
+          }
+
+          // Vlidate max uavailble day and time slotes
+          const blocks = row.unavailable_days_input as UnavailabilityBlock[];
+
+          if (blocks && blocks.length > 0) {
+            for (const b of blocks) {
+              if (
+                isNaN(b.start_hour) ||
+                isNaN(b.end_hour) ||
+                b.start_hour >= b.end_hour
+              ) {
+                return `Invalid time range in ${b.day}`;
+              }
+            }
+
+            // Total hours validation 
+            const totalHoursUnavailable = blocks.reduce(
+              (acc, b) => acc + (b.end_hour - b.start_hour),
+              0
+            );
+
+            if (totalHoursUnavailable >= 50) {
+              return "Lecturer must be available for at least one hour.";
+            }
+          }
+
+
+          return null;
+        }}
         sampleRows={[
-          ["John", "Smith", "STF001", "j.smith@uni.edu", "CS", "Wednesday"],
-          ["Alice", "Jones", "STF002", "a.jones@uni.edu", "EE", ""],
-          ["Bob", "Brown", "STF003", "", "MTH", "Monday;Friday"],
-        ]}
+          ["John", "Smith", "STF001", "j.smith@uni.edu", "CS", "Monday:8-10|12-14"],
+          ["Alice", "Jones", "STF002", "a.jones@uni.edu", "EE", "Tuesday:10-12"],
+          ["Bob", "Brown", "STF003", "", "MTH", "Monday:9-11;Friday:14-18"],]}
         onUpload={async (rows) => {
           let saved = 0;
           const errors: string[] = [];
@@ -221,7 +345,7 @@ export default function LecturersPage() {
                 staff_id: String(row.staff_id),
                 email: String(row.email ?? ""),
                 college: col.id,
-                unavailable_days_input: (row.unavailable_days_input as string[]) ?? [],
+                unavailable_days_input: row.unavailable_days_input as UnavailabilityBlock[],
               } as unknown as Lecturer);
               saved++;
             } catch (e) {

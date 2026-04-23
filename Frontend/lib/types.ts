@@ -41,6 +41,12 @@ export interface Department {
   college: number | College;
 }
 
+export interface UnavailabilityBlock {
+  day: string;
+  start_hour: number;
+  end_hour: number;
+}
+
 export interface Lecturer {
   id?: number;
   first_name: string;

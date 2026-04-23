@@ -64,6 +64,19 @@ function parseCSV(text: string): string[][] {
         return cols;
     });
 }
+//  Unavailable day slot formatter
+const formatUnavailable = (value: any) => {
+    if (!Array.isArray(value)) return "—";
+
+    if (value.length === 0) return "None";
+
+    return value
+        .map(
+            (v) =>
+                `${v.day}: ${v.start_hour}:00-${v.end_hour}:00`
+        )
+        .join(" | ");
+};
 
 // ── component ─────────────────────────────────────────────────────────────────
 
@@ -381,7 +394,9 @@ export default function CSVUploader<T extends object>({
                                                     </td>
                                                     {columns.map((col) => (
                                                         <td key={String(col.key)} className="px-3 py-2 text-black/70 whitespace-nowrap">
-                                                            {String(row.data[col.key] ?? "—")}
+                                                            {col.key === "unavailable_days_input"
+                                                                ? formatUnavailable(row.data[col.key])
+                                                                : String(row.data[col.key] ?? "—")}
                                                         </td>
                                                     ))}
                                                     <td className="px-3 py-2">
