@@ -243,8 +243,13 @@ export default function CoursesPage() {
           const type = String(row.course_type ?? "").toLowerCase();
           const deptCode = String(row.department ?? "").trim();
           const deptCodeNorm = normalize(row.department ?? "");
+          const code = String(row.code ?? "").trim().toUpperCase();
 
           const sharedCodes = (row.shared_departments as unknown as string[]) ?? [];
+
+          if (!/^(?=.*[A-Z])(?=.*\d)[A-Z\d]+$/i.test(code)) {
+            return `Invalid course code "${code}". It must contain both letters and numbers (e.g., CS101).`;
+          }
 
           if (!["departmental", "shared", "general"].includes(type)) {
             return `Invalid course_type "${row.course_type}". Must be departmental, shared, or general.`;
@@ -258,7 +263,7 @@ export default function CoursesPage() {
           if (type === "shared" && sharedCodes.length === 0) {
             return `course_type is "shared" but shared_department_codes is empty. Use semicolons to separate codes e.g. EE;MTH`;
           }
-          
+
           if (type === "shared") {
             const overlap = sharedCodes.find(
               (code) => normalize(code) === deptCodeNorm

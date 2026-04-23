@@ -111,6 +111,18 @@ export default function CSVUploader<T extends object>({
 
         const reader = new FileReader();
         reader.onload = (e) => {
+
+            const normalize = (v: any) => String(v).trim().toUpperCase();
+
+            const getColleges = (obj: any): string[] =>
+                Array.isArray(obj.colleges)
+                    ? obj.colleges.map(normalize).filter(Boolean)
+                    : [];
+
+            const hasOverlap = (a: string[], b: string[]) => {
+                const setB = new Set(b);
+                return a.some((c) => setB.has(c));
+            };
             const text = e.target?.result as string;
             const grid = parseCSV(text);
             if (grid.length < 2) {
@@ -123,8 +135,19 @@ export default function CSVUploader<T extends object>({
             const dataRows = grid.slice(1).filter((r) => r.some((c) => c !== ""));
 
             // Track unique keys seen within this file for intra-file dupe detection
-            const seenInFile = new Set<string>();
-            // Build a set of existing unique key values for db dupe detection
+            // --- Separate tracking ---
+            const seenInFileSet = new Set<string>(); // for normal entities
+            const seenInFileHall: { name: string; colleges: string[] }[] = [];
+
+            // Build DB records for Hall
+            const existingRecords =
+                entityName === "Hall"
+                    ? existingData.map((r: any) => ({
+                        name: String(r.name).trim().toLowerCase(),
+                        colleges: getColleges(r),
+                        hall_type: r.hall_type,
+                    }))
+                    : [];            // Build a set of existing unique key values for db dupe detection
             const existingKeys = new Set(
                 existingData.map((r) => String(r[uniqueKey]).toLowerCase())
             );
@@ -165,27 +188,101 @@ export default function CSVUploader<T extends object>({
                     }
                 }
 
+                // =======================
+                // HALL LOGIC
+                // =======================
+                if (entityName === "Hall") {
+                    const name = String(obj.name ?? "").trim().toLowerCase();
+                    const colleges = getColleges(obj);
+                    const hallType = String(obj.hall_type ?? "").toLowerCase();
+
+                    // 🔒 Structural validation
+                    if (hallType === "general" && colleges.length > 0) {
+                        return {
+                            index: idx + 2,
+                            data: obj as T,
+                            status: "invalid",
+                            reason: `General hall "${obj.name}" should not have any colleges`,
+                        };
+                    }
+
+                    if (hallType === "college" && colleges.length !== 1) {
+                        return {
+                            index: idx + 2,
+                            data: obj as T,
+                            status: "invalid",
+                            reason: `College hall "${obj.name}" must have exactly one college`,
+                        };
+                    }
+
+                    if (hallType === "shared" && colleges.length < 2) {
+                        return {
+                            index: idx + 2,
+                            data: obj as T,
+                            status: "invalid",
+                            reason: `Shared hall "${obj.name}" must have at least 2 colleges`,
+                        };
+                    }
+
+                    // 🔁 Duplicate logic
+                    if (hallType === "college" || hallType === "shared") {
+                        const fileDup = seenInFileHall.find(
+                            (r) => r.name === name && hasOverlap(r.colleges, colleges)
+                        );
+
+                        if (fileDup) {
+                            return {
+                                index: idx + 2,
+                                data: obj as T,
+                                status: "duplicate_file",
+                                reason: `Hall "${obj.name}" shares at least one college with another row`,
+                            };
+                        }
+
+                        const dbDup = existingRecords.find(
+                            (r) => r.name === name && hasOverlap(r.colleges, colleges)
+                        );
+
+                        if (dbDup) {
+                            return {
+                                index: idx + 2,
+                                data: obj as T,
+                                status: "duplicate_db",
+                                reason: `Hall "${obj.name}" conflicts with existing hall`,
+                            };
+                        }
+                    }
+
+                    seenInFileHall.push({ name, colleges });
+
+                    return { index: idx + 2, data: obj as T, status: "new" };
+                }
+
+                // =======================
+                // DEFAULT LOGIC
+                // =======================
                 const uniqueVal = String(obj[uniqueKey as string]).toLowerCase();
 
-                // Check intra-file duplicate
-                if (seenInFile.has(uniqueVal)) {
+                if (seenInFileSet.has(uniqueVal)) {
                     return {
-                        index: idx + 2, data: obj as T,
+                        index: idx + 2,
+                        data: obj as T,
                         status: "duplicate_file",
                         reason: `Duplicate within file (${String(uniqueKey)}: "${obj[uniqueKey as string]}")`,
                     };
                 }
 
-                // Check existing DB duplicate
                 if (existingKeys.has(uniqueVal)) {
                     return {
-                        index: idx + 2, data: obj as T,
+                        index: idx + 2,
+                        data: obj as T,
                         status: "duplicate_db",
                         reason: `Already exists in database (${String(uniqueKey)}: "${obj[uniqueKey as string]}")`,
                     };
                 }
 
-                seenInFile.add(uniqueVal);
+                seenInFileSet.add(uniqueVal);
+
                 return { index: idx + 2, data: obj as T, status: "new" };
             });
 

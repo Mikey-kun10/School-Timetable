@@ -181,7 +181,7 @@ export default function LecturersPage() {
                 <div className="flex flex-col gap-1">
                   {Object.entries(availableMap).map(([day, slots]) => (
                     <div key={day} className="flex flex-wrap gap-1 items-center">
-                      <span className={`font-mono text-xs ${getDayColor(day)}`}>
+                      <span className={`px-1 py-0.5 rounded-md font-mono border text-xs ${getDayColor(day)}`}>
                         {DAY_SHORT[day] ?? day}:
                       </span>
 
