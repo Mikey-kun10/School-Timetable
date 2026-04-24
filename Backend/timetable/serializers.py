@@ -83,9 +83,16 @@ class LecturerSerializer(serializers.ModelSerializer):
         fields = ['id', 'first_name', 'last_name', 'staff_id', 'college', 'email', 'unavailable_days', 'unavailable_days_input']
 
     def validate_unavailable_days_input(self, value):
-        from .models import DAYS_OF_WEEK
-        if len(value) >= len(DAYS_OF_WEEK):
-            raise serializers.ValidationError("A lecturer must be available for at least one day.")
+        if not value:
+            return value
+
+        total_hours = sum(
+            (block.get('end_hour', 18) - block.get('start_hour', 8)) 
+            for block in value
+        )
+        # Total weekly capacity is 5 days * 10 hours = 50 hours
+        if total_hours >= 50:
+            raise serializers.ValidationError("A lecturer must have at least one hour of availability per week.")
         return value
 
     def create(self, validated_data):

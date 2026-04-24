@@ -4,14 +4,14 @@ Timetable Scheduler — Min-Conflicts (Iterative Repair) Algorithm
 Constraints enforced:
 1. Monday–Friday, 8 AM – 6 PM
 2. No classes Wednesday 10 AM – 12 PM
-3. Global Lunch Break: 12 PM - 1 PM for all departments
-4. Max 4-hour continuous classes for any student group
-5. 1-unit → 1 hr, 2-unit → 2 hr, 3+ → multiple sessions (max 2 hr each)
-6. Hall capacity must fit TOTAL student count of the session
-7. Hall must match course department(s)
-8. No double-booking of halls or lecturers
-9. Lecturers cannot teach on their unavailable days/times
-10. Cross-listed courses (shared_session_id) share the same slot and hall
+Constraint 3: Soft Lunch Break (Wed 12-1 PM, Others 1-2 PM). Use only if hard to schedule.
+Constraint 4: Max 4-hour continuous classes for any student group
+Constraint 5: 1-unit -> 1 hr, 2-unit -> 2 hr, 3+ -> multiple sessions (max 2 hr each)
+Constraint 6: Hall capacity must fit TOTAL student count of the session
+Constraint 7: Hall must match course department(s)
+Constraint 8: No double-booking of halls or lecturers
+Constraint 9: Lecturers cannot teach on their unavailable days/times
+Constraint 10: Cross-listed courses (shared_session_id) share the same slot and hall
 """
 
 import random
@@ -28,6 +28,20 @@ from .models import (
 CAPACITY_UPPER_MULTIPLIER = 3
 
 
+def is_break_slot(day, start_hour, end_hour):
+    """
+    Returns True if the slot overlaps with the designated lunch break.
+    - Wednesdays: 12 PM - 1 PM
+    - Others: 1 PM - 2 PM
+    """
+    if day == 'Wednesday':
+        # Break is 12:00 - 13:00
+        return start_hour < 13 and end_hour > 12
+    else:
+        # Break is 13:00 - 14:00 (1 PM - 2 PM)
+        return start_hour < 14 and end_hour > 13
+
+
 def generate_time_slots():
     """Create all valid time slots in the database."""
     TimeSlot.objects.all().delete()
@@ -39,10 +53,9 @@ def generate_time_slots():
             for duration in [1, 2]:
                 end = start + duration
                 if end > 18: continue
-                # Wednesday: skip anything overlapping 10-12
+                # Wednesday: skip anything overlapping 10-12 (HARD BREAK)
                 if day == 'Wednesday' and start < 12 and end > 10: continue
-                # Global Lunch Break: skip anything overlapping 12 PM - 1 PM
-                if start < 13 and end > 12: continue
+                # Lunch breaks are now SOFT, so we include them here and penalize in the algorithm.
 
                 slot, is_new = TimeSlot.objects.get_or_create(
                     day=day, start_hour=start, end_hour=end
@@ -270,8 +283,12 @@ def generate_timetable():
             for hall in halls:
                 evict_set = get_conflicts(session, slot, hall, placed_sessions)
                 if evict_set is not None:
-                    # Score is the number of sessions we have to kick out
-                    candidates.append((len(evict_set), evict_set, slot, hall))
+                    # Penalty for break slots: 1 virtual conflict
+                    # This ensures we prefer a regular slot (score 0) over a break slot (score 1)
+                    # but a break slot (score 1) over evicting someone else (score 10+)
+                    penalty = 1 if is_break_slot(slot.day, slot.start_hour, slot.end_hour) else 0
+                    score = (len(evict_set) * 10) + penalty
+                    candidates.append((score, evict_set, slot, hall))
         
         if candidates:
             # Min-conflicts: Pick the one that evicts the fewest other sessions
@@ -286,7 +303,7 @@ def generate_timetable():
             else:
                  chosen = random.choice(best_options)
                  
-            num_evicts, evicts, best_slot, best_hall = chosen
+            best_score, evicts, best_slot, best_hall = chosen
             
             # Execute evictions
             for u in evicts:
