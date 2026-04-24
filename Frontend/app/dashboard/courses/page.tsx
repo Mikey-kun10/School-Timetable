@@ -288,7 +288,7 @@ export default function CoursesPage() {
             return `Invalid student_count "${row.student_count}". Must be at least 1.`;
           }
 
-          // ✅ Validate that departments actually exist
+          // Validate that departments actually exist
           // Check primary department (if provided)
           if (deptCodeNorm) {
             const exists = departments.some(
@@ -308,6 +308,27 @@ export default function CoursesPage() {
 
           if (invalidShared) {
             return `Invalid shared_department_code "${invalidShared}"`;
+          }
+
+          // ✅ Validate that staff actually exist
+          const lecturer = String(row.lecturer ?? "").trim();
+
+          if (!lecturer) {
+            return `Lecturer_ID is required.`;
+          }
+
+          // If no colleges exist yet in the DB, reject all rows with a clear message
+          if (lecturers.length === 0) {
+            return `No lecturers exist in the system yet. Add at least one Lecturer with a college first.`;
+          }
+
+          // Check if the college matches any existing college value (case-insensitive)
+          const match = lecturers.some(
+            (l) => l.staff_id.toLowerCase() === lecturer.toLowerCase()
+          );
+
+          if (!match) {
+            return `Lecturer with ID "${lecturer}" does not match any existing lecturer_ID. Valid lecturer_ID: ${lecturers.join(", ")}`;
           }
 
           return null; // null = valid
