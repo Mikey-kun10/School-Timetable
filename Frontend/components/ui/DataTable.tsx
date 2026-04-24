@@ -47,6 +47,14 @@ export default function DataTable<T extends { id?: number | string }>({
     setSearch("");
   };
 
+  const DAY_SHORT = [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+  ];
+
   // Build filtered data
   const filtered = useMemo(() => {
     return data.filter((row) => {
@@ -283,7 +291,7 @@ export default function DataTable<T extends { id?: number | string }>({
                 {columns.map((col) => (
                   <th
                     key={String(col.key)}
-                    className="px-4 py-3 text-left font-mono text-xs text-white/80 uppercase tracking-wider whitespace-nowrap"
+                    className={`${DAY_SHORT.includes(col.label) ? "px-1" : "px-4"} py-3 text-left font-mono text-xs text-white/80 uppercase tracking-wider whitespace-nowrap`}
                   >
                     {col.label}
                   </th>
@@ -323,7 +331,7 @@ export default function DataTable<T extends { id?: number | string }>({
                     className="border-b border-blue-800 hover:bg-blue-200/20 transition-colors"
                   >
                     {columns.map((col) => (
-                      <td key={String(col.key)} className="px-4 py-3 text-black/40">
+                      <td key={String(col.key)} className={`${DAY_SHORT.includes(col.label) ? "px-1" : "px-4"} py-3 text-black/40`}>
                         {col.render
                           ? col.render(row)
                           : String((row as Record<string, unknown>)[col.key as string] ?? "—")}

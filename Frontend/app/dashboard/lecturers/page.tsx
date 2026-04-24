@@ -9,12 +9,11 @@ import { lecturerApi, collegeApi, ApiError } from "@/lib/api";
 import CSVUploadModal from "@/components/ui/CSVUploadModal";
 import { Lecturer, College, DAYS, UnavailabilityBlock } from "@/lib/types";
 
-const DAY_SHORT: Record<string, string> = {
-  Monday: "Mon",
-  Tuesday: "Tue",
-  Wednesday: "Wed",
-  Thursday: "Thu",
-  Friday: "Fri",
+type Block = {
+  id: number;
+  day: string;
+  start_hour: number;
+  end_hour: number;
 };
 
 const DAY_COLORS: Record<string, string> = {
@@ -45,47 +44,35 @@ export default function LecturersPage() {
 
   const START_HOUR = 8;
   const END_HOUR = 18; // exclusive
-  const getAvailableSlots = (blocks: any[]) => {
-    const grouped: Record<string, { start: number; end: number }[]> = {};
+  const getAvailableSlotsForDay = (blocks: Block[]) => {
+    if (!blocks.length) {
+      return [`${START_HOUR}-${END_HOUR}`];
+    }
 
-    // group unavailable by day
-    blocks.forEach((b) => {
-      if (!grouped[b.day]) grouped[b.day] = [];
-      grouped[b.day].push({
+    // Extract and normalize intervals
+    const unavailable = blocks
+      .map(b => ({
         start: b.start_hour,
         end: b.end_hour,
-      });
-    });
+      }))
+      .sort((a, b) => a.start - b.start);
 
-    const result: Record<string, string[]> = {};
+    let current = START_HOUR;
+    const slots: string[] = [];
 
-    DAYS.forEach((day) => {
-      const unavailable = grouped[day] || [];
-
-      let current = START_HOUR;
-      const slots: string[] = [];
-
-      // sort intervals
-      unavailable.sort((a, b) => a.start - b.start);
-
-      for (const u of unavailable) {
-        if (current < u.start) {
-          slots.push(`${current}-${u.start}`);
-        }
-        current = Math.max(current, u.end);
+    for (const u of unavailable) {
+      if (current < u.start) {
+        slots.push(`${current}-${u.start}`);
       }
+      current = Math.max(current, u.end);
+    }
 
-      // remaining time after last block
-      if (current < END_HOUR) {
-        slots.push(`${current}-${END_HOUR}`);
-      }
+    // remaining time after last block
+    if (current < END_HOUR) {
+      slots.push(`${current}-${END_HOUR}`);
+    }
 
-      if (slots.length > 0) {
-        result[day] = slots;
-      }
-    });
-
-    return result;
+    return slots;
   };
 
   const load = useCallback(() => {
@@ -161,42 +148,95 @@ export default function LecturersPage() {
             filterable: true,
             filterValue: (r) => `${r.first_name} ${r.last_name}`,
             render: (r) => (
-              <span className="font-medium text-blue-400">
+              <span className="font-medium text-blue-400 text-nowrap">
                 {r.first_name} {r.last_name}
               </span>
             ),
           },
           { key: "email", label: "Email", filterable: true },
           {
-            key: "unavailable_days",
-            label: "Available Days",
-            render: (r) => {
-              const availableMap = getAvailableSlots(r.unavailable_days ?? []);
-
-              if (Object.keys(availableMap).length === 0) {
-                return "No Availability";
-              }
-
+            key: "mon", label: "Mon", render: (r) => {
+              const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Monday") ?? []);
               return (
-                <div className="flex flex-col gap-1">
-                  {Object.entries(availableMap).map(([day, slots]) => (
-                    <div key={day} className="flex flex-wrap gap-1 items-center">
-                      <span className={`px-1 py-0.5 rounded-md font-mono border text-xs ${getDayColor(day)}`}>
-                        {DAY_SHORT[day] ?? day}:
-                      </span>
-
-                      {slots.map((slot, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 rounded-md text-xs font-mono border"
-                        >
-                          {slot}
-                        </span>
-                      ))}
-                    </div>
+                <div className="flex flex-col gap-1 items-start">
+                  {availableMap.map((slot, i) => (
+                    <span
+                      key={i}
+                      className={`px-2 py-0.5 rounded-md text-xs font-mono border text-nowrap ${getDayColor("Monday")}`}
+                    >
+                      {slot}
+                    </span>
                   ))}
                 </div>
-              );
+              )
+            },
+          },
+          {
+            key: "tue", label: "Tue", render: (r) => {
+              const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Tuesday") ?? []);
+              return (
+                <div className="flex flex-col gap-1 items-start">
+                  {availableMap.map((slot, i) => (
+                    <span
+                      key={i}
+                      className={`px-2 py-0.5 rounded-md text-xs font-mono border text-nowrap ${getDayColor("Tuesday")}`}
+                    >
+                      {slot}
+                    </span>
+                  ))}
+                </div>
+              )
+            },
+          },
+          {
+            key: "wed", label: "Wed", render: (r) => {
+              const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Wednesday") ?? []);
+              return (
+                <div className="flex flex-col gap-1 items-start">
+                  {availableMap.map((slot, i) => (
+                    <span
+                      key={i}
+                      className={`px-2 py-0.5 rounded-md text-xs font-mono border text-nowrap ${getDayColor("Wednesday")}`}
+                    >
+                      {slot}
+                    </span>
+                  ))}
+                </div>
+              )
+            },
+          },
+          {
+            key: "thu", label: "Thu", render: (r) => {
+              const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Thursday") ?? []);
+              return (
+                <div className="flex flex-col gap-1 items-start">
+                  {availableMap.map((slot, i) => (
+                    <span
+                      key={i}
+                      className={`px-2 py-0.5 rounded-md text-xs font-mono border text-nowrap ${getDayColor("Thursday")}`}
+                    >
+                      {slot}
+                    </span>
+                  ))}
+                </div>
+              )
+            },
+          },
+          {
+            key: "fri", label: "Fri", render: (r) => {
+              const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Friday") ?? []);
+              return (
+                <div className="flex flex-col gap-1 items-start">
+                  {availableMap.map((slot, i) => (
+                    <span
+                      key={i}
+                      className={`px-2 py-0.5 rounded-md text-xs font-mono border text-nowrap ${getDayColor("Friday")}`}
+                    >
+                      {slot}
+                    </span>
+                  ))}
+                </div>
+              )
             },
           },
           {
@@ -229,6 +269,38 @@ export default function LecturersPage() {
           loading={loading}
         />
       </Modal>
+      {/* // {
+        //   key: "unavailable_days",
+        //   label: "Available Days",
+        //   render: (r) => {
+        //     const availableMap = getAvailableSlots(r.unavailable_days ?? []);
+
+        //     if (Object.keys(availableMap).length === 0) {
+        //       return "No Availability";
+        //     }
+
+        //     return (
+        //       <div className="flex flex-col gap-1">
+        //         {Object.entries(availableMap).map(([day, slots]) => (
+        //           <div key={day} className="flex flex-wrap gap-1 items-center">
+        //             <span className={`px-1 py-0.5 rounded-md font-mono border text-xs ${getDayColor(day)}`}>
+        //               {DAY_SHORT[day] ?? day}:
+        //             </span>
+
+        //             {slots.map((slot, i) => (
+        //               <span
+        //                 key={i}
+        //                 className="px-2 py-0.5 rounded-md text-xs font-mono border"
+        //               >
+        //                 {slot}
+        //               </span>
+        //             ))}
+        //           </div>
+        //         ))}
+        //       </div>
+        //     );
+        //   },
+        // }, */}
 
       <CSVUploadModal
         open={csvOpen}
