@@ -6,6 +6,8 @@ import { CalendarDays, RefreshCw, Filter, Printer, AlertTriangle, Clock } from "
 import { timetableApi, departmentApi, hallApi, courseApi, ApiError } from "@/lib/api";
 import { DAYS, TIME_SLOTS, LEVELS, Department, TimetableEntry, createParamCounter } from "@/lib/types";
 import Toast from "@/components/ui/Toast";
+import Modal from "@/components/ui/Modal";
+import SurveyModal from "@/components/ui/SurveyModalContent";
 
 const GRID_SLOTS = [
   { label: "8:00 - 9:00", start: 8 },
@@ -153,9 +155,9 @@ function PrintPortal({ children }: { children: React.ReactNode }) {
     container.id = "print-container";
     document.body.appendChild(container);
     el.current = container;
-    
+
     setMounted(true);
-    
+
     return () => {
       if (document.body.contains(container)) {
         document.body.removeChild(container);
@@ -391,6 +393,7 @@ export default function TimetablePage() {
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [unscheduled, setUnscheduled] = useState<UnscheduledItem[]>([]);
+  const [survey, setSurvey] = useState({ open: false });
   const [loading, setLoading] = useState(false);
   const [hasData, setHasData] = useState(false);
   const [totalScheduled, setTotalScheduled] = useState(0);
@@ -467,6 +470,16 @@ export default function TimetablePage() {
     const t = setTimeout(() => load(), 0);
     return () => clearTimeout(t);
   }, [load]);
+
+  useEffect(() => {
+    if (!hasData) return;
+
+    const timer = setTimeout(() => {
+      setSurvey({ open: true });
+    }, 2000); // delay in ms (e.g. 2 seconds)
+
+    return () => clearTimeout(timer); // cleanup
+  }, [hasData]);
 
   const generate = () => {
     setLoading(true);
@@ -666,10 +679,10 @@ export default function TimetablePage() {
                     {filteredUnscheduled.map((u, i) => (
                       <div key={i} className="flex flex-col p-3 rounded-xl bg-white/50 border border-rose-500/10">
                         <div className="flex items-center justify-between mb-1">
-                           <span className="text-xs font-bold text-rose-600">{u.course}</span>
-                           <span className="px-1.5 py-0.5 rounded bg-rose-100 text-[10px] text-rose-500 font-mono">
-                             {u.dept_code} | {u.level}L
-                           </span>
+                          <span className="text-xs font-bold text-rose-600">{u.course}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-rose-100 text-[10px] text-rose-500 font-mono">
+                            {u.dept_code} | {u.level}L
+                          </span>
                         </div>
                         <p className="text-[11px] text-rose-800/80 italic line-clamp-2">
                           {u.reason}
@@ -687,7 +700,7 @@ export default function TimetablePage() {
       {/* Legend */}
       {hasData && !loading && (
         <div className="flex flex-wrap gap-2 items-center no-print">
-          <span className="text-xs text-slate-500 font-mono mr-1">Level:</span>
+          <span className="text-xs text-black/60 font-mono mr-1">Level:</span>
           {Object.entries(LEVEL_COLORS).map(([level, cls]) => (
             <span
               key={level}
@@ -698,6 +711,7 @@ export default function TimetablePage() {
           ))}
         </div>
       )}
+      
       {hasData && !loading && (
         <div className="hidden md:block rounded-xl border border-black/60 overflow-hidden no-print">
           <div className="overflow-x-auto">
@@ -818,19 +832,19 @@ export default function TimetablePage() {
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-500 mt-0.5 gap-1 flex">
+                          <p className="text-xs text-black/60 mt-0.5 gap-1 flex">
                             <span className="text-blue-500">Lecturer:</span>
                             {entry.lecturer.first_name + " " + entry.lecturer.last_name}
                           </p>
 
-                          <p className="text-xs text-slate-500 gap-1 flex">
+                          <p className="text-xs text-black/60 gap-1 flex">
                             <span className="text-blue-500">Hall:</span>
                             {entry.hall?.name}
                           </p>
                         </div>
 
                         {/* Duration */}
-                        <div className="font-mono text-xs text-slate-600 shrink-0">
+                        <div className="font-mono text-xs text-black/60 shrink-0">
                           {entry.time_slot.duration}h
                         </div>
                       </div>
@@ -840,6 +854,16 @@ export default function TimetablePage() {
             );
           })}
         </div>
+      )}
+
+      {hasData && (
+        <Modal
+          title={"Take Survey"}
+          open={survey.open}
+          onClose={() => setSurvey({ open: false })}
+        >
+          <SurveyModal />
+        </Modal>
       )}
 
       {/* ── print layout (hidden on screen, visible on print) ── */}
