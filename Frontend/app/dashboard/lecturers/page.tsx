@@ -157,6 +157,9 @@ export default function LecturersPage() {
           {
             key: "mon", label: "Mon", render: (r) => {
               const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Monday") ?? []);
+              if (availableMap.length === 0) {
+                return "—";
+              }
               return (
                 <div className="flex flex-col gap-1 items-start">
                   {availableMap.map((slot, i) => (
@@ -174,6 +177,9 @@ export default function LecturersPage() {
           {
             key: "tue", label: "Tue", render: (r) => {
               const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Tuesday") ?? []);
+              if (availableMap.length === 0) {
+                return "—";
+              }
               return (
                 <div className="flex flex-col gap-1 items-start">
                   {availableMap.map((slot, i) => (
@@ -191,6 +197,9 @@ export default function LecturersPage() {
           {
             key: "wed", label: "Wed", render: (r) => {
               const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Wednesday") ?? []);
+              if (availableMap.length === 0) {
+                return "—";
+              }
               return (
                 <div className="flex flex-col gap-1 items-start">
                   {availableMap.map((slot, i) => (
@@ -208,6 +217,9 @@ export default function LecturersPage() {
           {
             key: "thu", label: "Thu", render: (r) => {
               const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Thursday") ?? []);
+              if (availableMap.length === 0) {
+                return "—";
+              }
               return (
                 <div className="flex flex-col gap-1 items-start">
                   {availableMap.map((slot, i) => (
@@ -225,6 +237,9 @@ export default function LecturersPage() {
           {
             key: "fri", label: "Fri", render: (r) => {
               const availableMap = getAvailableSlotsForDay(r.unavailable_days?.filter((d) => d.day === "Friday") ?? []);
+              if (availableMap.length === 0) {
+                return "—";
+              }
               return (
                 <div className="flex flex-col gap-1 items-start">
                   {availableMap.map((slot, i) => (
