@@ -711,7 +711,7 @@ export default function TimetablePage() {
           ))}
         </div>
       )}
-      
+
       {hasData && !loading && (
         <div className="hidden md:block rounded-xl border border-black/60 overflow-hidden no-print">
           <div className="overflow-x-auto">
@@ -743,13 +743,23 @@ export default function TimetablePage() {
               {/* BODY */}
               {DAYS.map((day, di) => {
 
+                const expanded: Record<number, TimetableEntry[]> = {};
+
+                for (const entries of Object.values(grid[day] ?? {})) {
+                  for (const entry of entries) {
+                    for (let h = entry.time_slot.start_hour; h < entry.time_slot.end_hour; h++) {
+                      if (!expanded[h]) expanded[h] = [];
+                      expanded[h].push(entry);
+                    }
+                  }
+                }
+
                 let maxCount = 0;
 
                 for (const slot of GRID_SLOTS) {
-                  const entries = grid[day]?.[slot.start] ?? [];
-
-                  if (entries.length > maxCount) {
-                    maxCount = entries.length;
+                  const count = expanded[slot.start]?.length ?? 0;
+                  if (count > maxCount) {
+                    maxCount = count;
                   }
                 }
                 return (
