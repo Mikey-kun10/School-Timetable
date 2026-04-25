@@ -99,7 +99,7 @@ export default function DataTable<T extends { id?: number | string }>({
             {data.length} record{data.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="sm:ml-auto flex items-center gap-2">
+        <div className="sm:ml-auto flex items-center flex-wrap gap-2">
           <div className="relative">
             <Search
               size={14}
