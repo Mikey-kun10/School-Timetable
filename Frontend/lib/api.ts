@@ -1,6 +1,6 @@
 import { College, Department, Lecturer, Hall, Course, GenerateResult, TimetableEntry } from "./types";
 
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 
 export class ApiError extends Error {
   status: number;
