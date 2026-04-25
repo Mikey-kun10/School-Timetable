@@ -21,6 +21,8 @@ const GRID_SLOTS = [
   { label: "04:00 - 05:00", start: 16 },
   { label: "05:00 - 06:00", start: 17 },
 ];
+const Days_Short = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const Days_long = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 interface UnscheduledItem {
   course: string;
@@ -397,6 +399,7 @@ export default function TimetablePage() {
   const [loading, setLoading] = useState(false);
   const [hasData, setHasData] = useState(false);
   const [totalScheduled, setTotalScheduled] = useState(0);
+  const [currentDayPage, setDayPage] = useState("Mon")
 
   const [stats, setStats] = useState<Stats>({
     courses: 0, halls: 0, totalSessions: 0
@@ -497,6 +500,12 @@ export default function TimetablePage() {
       })
       .finally(() => setLoading(false));
   };
+
+  const nextDayPage = (index: number) => {
+    const i = Days_Short.findIndex((day) => day === currentDayPage);
+    if (i === index) return;
+    setDayPage(Days_Short[index]);
+  }
 
   const handlePrint = () => {
     window.print();
@@ -790,17 +799,24 @@ export default function TimetablePage() {
       {/* ── mobile card view ── */}
       {hasData && !loading && (
         <div className="md:hidden space-y-4 no-print">
-          {DAYS.map((day) => {
+          <div className="w-full flex justify-center mt-5">
+            <div className="flex gap-2">
+              {Days_Short.map((shortDay, i) => (
+                <div key={i} onClick={() => nextDayPage(i)} className={`cursor-pointer px-2 py-0.5 rounded-md text-xs border font-mono text-white/70 bg-blue-500 hover:opacity-60 ${shortDay === currentDayPage ? "opacity-60" : "opacity-100"}`}>{shortDay}</div>
+              ))}
+            </div>
+          </div>
+          {(() => {
             const dayEntries = entries.filter(
-              (e) => e.time_slot.day === day
+              (e) => e.time_slot.day === Days_long[Days_Short.findIndex(d => d === currentDayPage)]
             );
 
             if (dayEntries.length === 0) return null;
 
             return (
-              <div key={day} className="rounded-xl border border-blue-800 overflow-hidden">
+              <div className="rounded-xl border border-blue-800 overflow-hidden">
                 <div className="px-4 py-3 bg-blue-900 border-b border-blue-800 flex items-center justify-between">
-                  <h3 className="font-medium text-white/80 text-sm">{day}</h3>
+                  <h3 className="font-medium text-white/80 text-sm">{Days_long[Days_Short.findIndex(d => d === currentDayPage)]}</h3>
                   <span className="font-mono text-xs text-white/80">
                     {dayEntries.length} class{dayEntries.length !== 1 ? "es" : ""}
                   </span>
@@ -862,7 +878,7 @@ export default function TimetablePage() {
                 </div>
               </div>
             );
-          })}
+          })()}
         </div>
       )}
 
