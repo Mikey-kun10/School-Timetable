@@ -8,7 +8,7 @@ export default function SurveyModalContent() {
     satisfaction: "",
   });
 
-  const GOOGLE_FORM_LINK = "https://forms.gle/your-link-here";
+  const GOOGLE_FORM_LINK = process.env.GOOGLE_FORM_LINK;
 
   const isValid =
     form.role && form.satisfaction;
