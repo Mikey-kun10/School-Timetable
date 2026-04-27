@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export default function SurveyModalContent() {
   const [form, setForm] = useState({
@@ -8,7 +9,7 @@ export default function SurveyModalContent() {
     satisfaction: "",
   });
 
-  const GOOGLE_FORM_LINK = process.env.GOOGLE_FORM_LINK;
+  const GOOGLE_FORM_LINK = "https://docs.google.com/forms/d/e/1FAIpQLSd_ltoaUYhU1BmD3c48KqOQPy8zkRP1za4A-WgutB3uojh1cw/viewform?usp=header";
 
   const isValid =
     form.role && form.satisfaction;
@@ -63,7 +64,7 @@ export default function SurveyModalContent() {
 
       {/* CTA */}
       <div className="pt-2">
-        <a
+        <Link
           href={GOOGLE_FORM_LINK}
           target="_blank"
           rel="noopener noreferrer"
@@ -73,7 +74,7 @@ export default function SurveyModalContent() {
             }`}
         >
           Continue to Full Survey
-        </a>
+        </Link>
       </div>
     </div>
   );
